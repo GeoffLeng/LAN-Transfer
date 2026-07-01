@@ -1,0 +1,111 @@
+import React, { useState } from 'react'
+import { Laptop, Search } from 'lucide-react'
+import { ShibaAvatar } from './ShibaAvatar'
+
+interface Device {
+  id: string
+  name: string
+  ip: string
+  port: number
+  avatarIndex: number
+}
+
+interface RadarProps {
+  devices: Device[]
+  onSelectDevice: (device: Device) => void
+  onDirectConnect?: (ip: string) => void
+}
+
+export const Radar: React.FC<RadarProps> = ({ devices, onSelectDevice, onDirectConnect }) => {
+  const [directIp, setDirectIp] = useState('')
+
+  const handleDirectConnect = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (directIp.trim() && onDirectConnect) {
+      onDirectConnect(directIp.trim())
+    }
+  }
+
+  return (
+    <div className="relative flex-1 h-full flex flex-col items-center justify-center p-6 text-white overflow-hidden pb-24">
+      {/* Search Header Info */}
+      <div className="absolute top-8 left-10 flex items-center gap-2 bg-white/5 border border-white/10 px-4 py-2 rounded-full backdrop-blur-md">
+        <Search className="w-4 h-4 text-white/60 animate-pulse" />
+        <span className="text-xs text-white/80 font-medium">正在扫描局域网设备...</span>
+      </div>
+
+      {/* Radar Animation Rings */}
+      <div className="absolute w-[500px] h-[500px] flex items-center justify-center pointer-events-none select-none">
+        <div className="absolute w-full h-full rounded-full border border-white/5 radar-pulse-wave"></div>
+        <div className="absolute w-[360px] h-[360px] rounded-full border border-white/10 radar-pulse-wave" style={{ animationDelay: '1s' }}></div>
+        <div className="absolute w-[220px] h-[220px] rounded-full border border-white/15 radar-pulse-wave" style={{ animationDelay: '2s' }}></div>
+        
+        {/* Core Pulsing Center */}
+        <div className="w-16 h-16 rounded-full bg-gradient-to-tr from-blue-500 to-indigo-600 flex items-center justify-center border border-white/30 shadow-2xl shadow-blue-500/50">
+          <Laptop className="w-6 h-6 text-white" />
+        </div>
+      </div>
+
+      {/* Peer Cards Overlay Area */}
+      <div className="relative z-10 w-full max-w-2xl grid grid-cols-2 sm:grid-cols-3 gap-6 justify-center items-center mt-20">
+        {devices.map((device) => {
+          return (
+            <button
+              key={device.id}
+              onClick={() => onSelectDevice(device)}
+              className="liquid-glass-card p-5 rounded-xl flex flex-col items-center justify-center text-center cursor-pointer select-none group border border-white/10 w-full"
+            >
+              {/* Avatar Container with glowing hover */}
+              <div className="relative w-16 h-16 rounded-lg bg-white/5 flex items-center justify-center border border-white/10 shadow-md mb-4 group-hover:scale-105 transition-transform duration-300">
+                <ShibaAvatar index={device.avatarIndex} size={54} />
+                <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 border-2 border-[#121214] rounded-full"></div>
+              </div>
+              
+              {/* Device Text */}
+              <h3 className="font-semibold text-sm text-white group-hover:text-blue-300 transition-colors duration-300 truncate max-w-full">
+                {device.name}
+              </h3>
+              <p className="text-[10px] text-white/50 font-mono mt-1">{device.ip}</p>
+              
+              {/* Tap to send prompt */}
+              <span className="text-[9px] bg-blue-500/20 text-blue-300 border border-blue-500/30 px-2 py-0.5 rounded-full mt-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                点击发送文件
+              </span>
+            </button>
+          )
+        })}
+      </div>
+
+      {/* Empty State */}
+      {devices.length === 0 && (
+        <div className="text-center text-white/40 max-w-xs mt-20 select-none pointer-events-none">
+          <p className="text-sm font-medium">无其他在线设备</p>
+          <p className="text-xs mt-1">在其他电脑上打开本应用即可自动连入</p>
+        </div>
+      )}
+
+      {/* Direct IP Fallback Connection Box */}
+      <form 
+        onSubmit={handleDirectConnect}
+        className="absolute bottom-6 left-6 right-6 flex items-center gap-3 bg-white/5 border border-white/10 p-2.5 rounded-xl backdrop-blur-md max-w-md mx-auto z-20"
+      >
+        <div className="flex-1">
+          <input
+            type="text"
+            placeholder="输入局域网 IP 直连 (例: 192.168.0.6)"
+            value={directIp}
+            onChange={(e) => setDirectIp(e.target.value)}
+            className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white placeholder-white/40 focus:outline-none focus:border-blue-500/50"
+          />
+        </div>
+        <button
+          type="submit"
+          disabled={!directIp.trim()}
+          className="bg-blue-600 hover:bg-blue-500 disabled:bg-white/5 disabled:text-white/30 text-white font-medium text-xs px-4 py-1.5 rounded-lg transition-colors duration-200 border border-white/10 shrink-0"
+        >
+          直接连接
+        </button>
+      </form>
+    </div>
+  )
+}

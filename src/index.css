@@ -1,0 +1,202 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply text-slate-800 font-sans antialiased;
+    background: transparent;
+  }
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* Theme variables */
+:root {
+  --glass-panel-bg: rgb(15, 23, 42); /* Sleek slate dark (opaque) */
+  --glass-panel-border: rgba(255, 255, 255, 0.08);
+  --glass-sidebar-bg: rgba(9, 15, 30, 0.45);
+  --glass-sidebar-border: rgba(255, 255, 255, 0.06);
+  --glass-card-bg: rgba(255, 255, 255, 0.05);
+  --glass-card-border: rgba(255, 255, 255, 0.06);
+  --glass-card-hover-bg: rgba(255, 255, 255, 0.08);
+  --glass-card-hover-border: rgba(255, 255, 255, 0.12);
+  
+  --text-primary: rgba(255, 255, 255, 0.95);
+  --text-secondary: rgba(255, 255, 255, 0.6);
+  --text-muted: rgba(255, 255, 255, 0.35);
+  --border-color: rgba(255, 255, 255, 0.08);
+}
+
+.theme-light {
+  --glass-panel-bg: rgb(243, 244, 246); /* iOS 26 style milky white glass (opaque) */
+  --glass-panel-border: rgba(0, 0, 0, 0.08);
+  --glass-sidebar-bg: rgba(240, 240, 243, 0.72);
+  --glass-sidebar-border: rgba(0, 0, 0, 0.06);
+  --glass-card-bg: rgba(255, 255, 255, 0.65);
+  --glass-card-border: rgba(0, 0, 0, 0.05);
+  --glass-card-hover-bg: rgba(255, 255, 255, 0.85);
+  --glass-card-hover-border: rgba(0, 0, 0, 0.1);
+  
+  --text-primary: rgba(15, 23, 42, 0.95); /* Slate 900 text */
+  --text-secondary: rgba(15, 23, 42, 0.65);
+  --text-muted: rgba(15, 23, 42, 0.4);
+  --border-color: rgba(0, 0, 0, 0.08);
+}
+
+/* Theme generic selectors */
+.theme-dark, .theme-light {
+  color: var(--text-primary);
+}
+
+/* Override text utilities when in light theme */
+.theme-light .text-white {
+  color: var(--text-primary) !important;
+}
+.theme-light .text-white\/70,
+.theme-light .text-white\/80,
+.theme-light .text-white\/60,
+.theme-light .text-white\/50 {
+  color: var(--text-secondary) !important;
+}
+.theme-light .text-white\/40,
+.theme-light .text-white\/30,
+.theme-light .text-white\/20,
+.theme-light .text-white\/10 {
+  color: var(--text-muted) !important;
+}
+
+.theme-light .border-white\/5,
+.theme-light .border-white\/10,
+.theme-light .border-white\/15,
+.theme-light .border-white\/20 {
+  border-color: var(--border-color) !important;
+}
+
+.theme-light .bg-white\/5,
+.theme-light .bg-white\/10 {
+  background-color: rgba(0, 0, 0, 0.04) !important;
+}
+
+.theme-light .bg-white\/20,
+.theme-light .bg-white\/30 {
+  background-color: rgba(0, 0, 0, 0.08) !important;
+}
+
+.theme-light .hover\:bg-white\/5:hover {
+  background-color: rgba(0, 0, 0, 0.03) !important;
+}
+.theme-light .hover\:bg-white\/10:hover {
+  background-color: rgba(0, 0, 0, 0.06) !important;
+}
+
+.theme-light .focus\:bg-white\/10:focus {
+  background-color: rgba(0, 0, 0, 0.06) !important;
+}
+.theme-light .focus\:border-blue-500:focus {
+  border-color: #3b82f6 !important;
+}
+
+.theme-light input {
+  color: var(--text-primary) !important;
+  background-color: rgba(0, 0, 0, 0.03) !important;
+  border-color: rgba(0, 0, 0, 0.08) !important;
+}
+.theme-light input::placeholder {
+  color: var(--text-muted) !important;
+}
+
+/* Solid colored components override in light mode */
+.theme-light .bg-blue-600,
+.theme-light .bg-blue-500,
+.theme-light .bg-yellow-600,
+.theme-light .bg-red-600 {
+  color: #ffffff !important;
+}
+.theme-light .bg-blue-600 *,
+.theme-light .bg-blue-500 *,
+.theme-light .bg-yellow-600 *,
+.theme-light .bg-red-600 * {
+  color: #ffffff !important;
+}
+
+/* iOS 26 Liquid Glass Effects */
+.liquid-glass-panel {
+  background: var(--glass-panel-bg);
+  backdrop-filter: blur(40px);
+  -webkit-backdrop-filter: blur(40px);
+  border: 1px solid var(--glass-panel-border);
+  box-shadow: 
+    0 8px 32px 0 rgba(0, 0, 0, 0.12),
+    inset 0 1px 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+.liquid-glass-sidebar {
+  background: var(--glass-sidebar-bg);
+  backdrop-filter: blur(45px);
+  -webkit-backdrop-filter: blur(45px);
+  border-right: 1px solid var(--glass-sidebar-border);
+}
+
+.liquid-glass-card {
+  background: var(--glass-card-bg);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--glass-card-border);
+  box-shadow: 0 4px 16px 0 rgba(0, 0, 0, 0.05);
+  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+.liquid-glass-card:hover {
+  background: var(--glass-card-hover-bg);
+  border-color: var(--glass-card-hover-border);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px 0 rgba(0, 0, 0, 0.08);
+}
+
+/* Electron Window Drag */
+.titlebar-drag {
+  -webkit-app-region: drag;
+}
+
+.titlebar-no-drag {
+  -webkit-app-region: no-drag;
+}
+
+/* Animations */
+@keyframes radar-pulse {
+  0% {
+    transform: scale(0.8);
+    opacity: 0.8;
+  }
+  100% {
+    transform: scale(2.2);
+    opacity: 0;
+  }
+}
+
+.radar-pulse-wave {
+  animation: radar-pulse 3s cubic-bezier(0.1, 0.8, 0.3, 1) infinite;
+}
+
+/* iOS typical gradients for avatars */
+.bg-gradient-avatar-0 { background: linear-gradient(135deg, #FF5E62 0%, #FF9966 100%); }
+.bg-gradient-avatar-1 { background: linear-gradient(135deg, #00B4DB 0%, #0083B0 100%); }
+.bg-gradient-avatar-2 { background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); }
+.bg-gradient-avatar-3 { background: linear-gradient(135deg, #8E2DE2 0%, #4A00E0 100%); }
+.bg-gradient-avatar-4 { background: linear-gradient(135deg, #f857a6 0%, #ff5858 100%); }
+.bg-gradient-avatar-5 { background: linear-gradient(135deg, #F3904F 0%, #3B4371 100%); }

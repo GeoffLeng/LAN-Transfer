@@ -857,22 +857,24 @@ ipcMain.handle('resume-transfer', (_event, id) => {
 ipcMain.handle('cancel-transfer', (_event, id) => {
   const outgoing = activeOutgoings.get(id)
   if (outgoing) {
-    sendControlMessage(outgoing.targetIp, id, 'cancel')
-    setTimeout(() => {
-      outgoing.socket.destroy()
-    }, 100)
+    // Stop readStream first to prevent more data from being piped
+    if (outgoing.readStream) {
+      outgoing.readStream.destroy()
+    }
+    outgoing.socket.destroy()
     activeOutgoings.delete(id)
+    // Notify the receiver asynchronously (new socket)
+    sendControlMessage(outgoing.targetIp, id, 'cancel')
     return true
   }
   const incoming = activeIncomingTransfers.get(id)
   if (incoming) {
+    incoming.socket.destroy()
+    activeIncomingTransfers.delete(id)
+    // Notify the sender asynchronously (new socket)
     if (incoming.senderIp) {
       sendControlMessage(incoming.senderIp, id, 'cancel')
     }
-    setTimeout(() => {
-      incoming.socket.destroy()
-    }, 100)
-    activeIncomingTransfers.delete(id)
     return true
   }
   return false

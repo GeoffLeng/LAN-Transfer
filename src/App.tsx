@@ -142,7 +142,13 @@ export default function App() {
 
     // 4. Setup progress listener
     const unsubscribeProgress = window.electronAPI.onTransferProgress((data) => {
+      // Skip ALL events for transfers that have been cancelled
+      if (cancelledIdsRef.current.has(data.id)) {
+        return
+      }
+
       if (data.status === 'cancelled') {
+        cancelledIdsRef.current.add(data.id)
         handleTransferComplete({
           id: data.id,
           direction: data.direction,
@@ -199,6 +205,11 @@ export default function App() {
   }, [])
 
   const handleTransferComplete = (data: any, status: 'completed' | 'failed' | 'declined' | 'cancelled') => {
+    // Skip if this transfer was already cancelled
+    if (status !== 'cancelled' && cancelledIdsRef.current.has(data.id)) {
+      return
+    }
+
     // Add to history
     const isOutgoing = data.direction === 'outgoing'
     const newRecord: TransferRecord = {
@@ -213,12 +224,8 @@ export default function App() {
 
     setHistory(prev => [newRecord, ...prev])
 
-    // Update status in Dynamic Island
-    setTransferState((prev: any) => prev ? { ...prev, status } : null)
-
-    // Clear after 3 seconds, or instantly if cancelled
-    const delay = status === 'cancelled' ? 0 : 3000
-    setTimeout(() => {
+    if (status === 'cancelled') {
+      // Immediately clear everything synchronously
       setTransferState(null)
       if (isOutgoing) {
         setSelectedDevice(null)
@@ -226,7 +233,21 @@ export default function App() {
       } else {
         setIncomingTransfer(null)
       }
-    }, delay)
+    } else {
+      // Update status in Dynamic Island
+      setTransferState((prev: any) => prev ? { ...prev, status } : null)
+
+      // Clear after 3 seconds
+      setTimeout(() => {
+        setTransferState(null)
+        if (isOutgoing) {
+          setSelectedDevice(null)
+          setSelectedFiles([])
+        } else {
+          setIncomingTransfer(null)
+        }
+      }, 3000)
+    }
 
     lastBytesRef.current = 0
   }

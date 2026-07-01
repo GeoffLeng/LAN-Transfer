@@ -83,7 +83,7 @@ export const DynamicIsland: React.FC<DynamicIslandProps> = ({
     <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-50 pointer-events-none select-none">
       <div
         onClick={handleCardClick}
-        className={`bg-black/95 text-white flex items-center justify-between px-5 py-2.5 shadow-2xl transition-all duration-500 ease-out border border-white/10 overflow-hidden pointer-events-auto cursor-pointer hover:bg-black/90 active:scale-[0.99] ${dimensions}`}
+        className={`dynamic-island-pill bg-black/95 text-white flex items-center justify-between px-5 py-2.5 shadow-2xl transition-all duration-500 ease-out border border-white/10 overflow-hidden pointer-events-auto cursor-pointer hover:bg-black/90 active:scale-[0.99] ${dimensions}`}
       >
         {/* Progressing/Paused state */}
         {isTransferring && (

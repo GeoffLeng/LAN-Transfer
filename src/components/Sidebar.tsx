@@ -29,7 +29,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <img src={logoImg} alt="Logo" className="w-full h-full object-cover" />
           </div>
           <div>
-            <h1 className="font-bold text-base leading-tight tracking-wide">Transfer</h1>
+            <h1 className="font-bold text-base leading-tight tracking-wide">LAN Transfer</h1>
             <p className="text-[10px] text-white/50 tracking-wider">Windows Client</p>
           </div>
         </div>

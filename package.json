@@ -1,7 +1,7 @@
 {
   "name": "lan-filetransfer",
   "version": "1.0.0",
-  "description": "LAN File Transfer App - Transfer",
+  "description": "LAN File Transfer App - LAN Transfer",
   "author": "GeoffLeng",
   "main": "dist-electron/main.js",
   "scripts": {
@@ -10,7 +10,7 @@
   },
   "build": {
     "appId": "com.transfer",
-    "productName": "Transfer",
+    "productName": "LAN Transfer",
     "directories": {
       "output": "release"
     },

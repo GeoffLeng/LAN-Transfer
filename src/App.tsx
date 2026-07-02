@@ -397,7 +397,7 @@ export default function App() {
         
         {/* Windows style top header/titlebar */}
         <div className="titlebar-drag h-12 w-full flex items-center justify-between pl-6 pr-2 border-b border-white/5 relative z-30 select-none">
-          <div className="text-[11px] text-white/40 font-semibold tracking-widest uppercase">Transfer</div>
+          <div className="text-[11px] text-white/40 font-semibold tracking-widest uppercase">LAN Transfer</div>
           
           {/* Windows-style Window Controls on the right */}
           <div className="titlebar-no-drag flex items-center h-full">

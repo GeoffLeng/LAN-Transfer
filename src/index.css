@@ -3,9 +3,11 @@
 @tailwind utilities;
 
 @layer base {
+  html, body, #root {
+    background: transparent !important;
+  }
   body {
     @apply text-slate-800 font-sans antialiased;
-    background: transparent;
   }
 }
 

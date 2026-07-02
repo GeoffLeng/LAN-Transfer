@@ -30,8 +30,10 @@
         }
       ]
     },
-    "portable": {
-      "artifactName": "${productName}_Portable_${version}.${ext}"
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "artifactName": "${productName}_Setup_${version}.${ext}"
     }
   },
   "dependencies": {

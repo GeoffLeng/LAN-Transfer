@@ -390,10 +390,12 @@ export default function App() {
     <div className={`relative w-screen h-screen overflow-hidden flex justify-center items-center bg-transparent p-2 font-sans select-none ${theme === 'dark' ? 'theme-dark' : 'theme-light'}`}>
       {/* Main Container */}
       <div className="w-full h-full rounded-3xl overflow-hidden border border-white/10 flex liquid-glass-panel relative flex-col shadow-2xl">
-        {/* Dynamic blurred iOS mesh background blobs */}
-        <div className="absolute top-[-10%] left-[-10%] w-[55%] h-[55%] bg-blue-600/20 rounded-full blur-[120px] pointer-events-none"></div>
-        <div className="absolute bottom-[-10%] right-[-10%] w-[55%] h-[55%] bg-purple-600/25 rounded-full blur-[120px] pointer-events-none"></div>
-        <div className="absolute top-[30%] right-[10%] w-[35%] h-[35%] bg-indigo-500/15 rounded-full blur-[100px] pointer-events-none"></div>
+        {/* Dynamic blurred iOS mesh background blobs — wrapped in clip-path container to prevent blur bleeding outside rounded corners */}
+        <div className="absolute inset-0 overflow-hidden rounded-[inherit] pointer-events-none" style={{ clipPath: 'inset(0 round 1.5rem)' }}>
+          <div className="absolute top-[-10%] left-[-10%] w-[55%] h-[55%] bg-blue-600/20 rounded-full blur-[120px]"></div>
+          <div className="absolute bottom-[-10%] right-[-10%] w-[55%] h-[55%] bg-purple-600/25 rounded-full blur-[120px]"></div>
+          <div className="absolute top-[30%] right-[10%] w-[35%] h-[35%] bg-indigo-500/15 rounded-full blur-[100px]"></div>
+        </div>
         
         {/* Windows style top header/titlebar */}
         <div className="titlebar-drag h-12 w-full flex items-center justify-between pl-6 pr-2 border-b border-white/5 relative z-30 select-none">

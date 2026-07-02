@@ -357,7 +357,12 @@ function startTcpServer() {
             }
           }
         } else {
-          // Accumulate into header buffer
+          // Prevent buffer from growing infinitely (OOM protection)
+          if (buffer.length > 1024 * 1024 * 5) {
+            socket.destroy()
+            return
+          }
+
           buffer = Buffer.concat([buffer, chunk.subarray(offset)])
           offset = chunk.length // Consume all remaining bytes of the chunk into the buffer
 
@@ -367,6 +372,13 @@ function startTcpServer() {
             if (!isAccepted) {
               if (buffer.length < 4) break
               const jsonLength = buffer.readInt32BE(0)
+              
+              // Validate packet size limits to prevent negative/overflow values
+              if (jsonLength <= 0 || jsonLength > 1024 * 1024) {
+                socket.destroy()
+                return
+              }
+              
               if (buffer.length < 4 + jsonLength) break
 
               const jsonStr = buffer.subarray(4, 4 + jsonLength).toString('utf-8')
@@ -501,6 +513,13 @@ function startTcpServer() {
               // accepted and expecting a file header
               if (buffer.length < 4) break
               const headerLength = buffer.readInt32BE(0)
+              
+              // Validate packet size limits to prevent negative/overflow values
+              if (headerLength <= 0 || headerLength > 1024 * 1024) {
+                socket.destroy()
+                return
+              }
+              
               if (buffer.length < 4 + headerLength) break
 
               const headerJson = buffer.subarray(4, 4 + headerLength).toString('utf-8')
@@ -513,8 +532,10 @@ function startTcpServer() {
                 currentFileExpectedSize = fileHeader.size
                 bytesReceivedForCurrentFile = 0
 
-                // Security: sanitize path to prevent directory traversal attacks
-                const safeName = path.basename(relativePath)
+                // Security: sanitize path to prevent directory traversal attacks.
+                // Replace all backslashes with forward slashes to ensure cross-platform safety for path.basename.
+                const normalizedPath = relativePath.replace(/\\/g, '/')
+                const safeName = path.basename(normalizedPath)
                 const destPath = path.join(saveDir, safeName)
                 const destDir = path.dirname(destPath)
                 if (!fs.existsSync(destDir)) {

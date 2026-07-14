@@ -4,6 +4,8 @@
 ![Platform](https://img.shields.io/badge/Platform-Windows-orange.svg)
 ![License](https://img.shields.io/badge/License-MIT-green.svg)
 
+[![Download Windows EXE](https://img.shields.io/badge/Download-Windows_EXE-blue?style=for-the-badge&logo=windows&logoColor=white)](releases/LAN_Transfer_Setup_1.0.0.exe)
+
 **LAN Transfer** 是一款基于 Electron + React + Tailwind CSS 构建的极速局域网（LAN）文件传输助手。它拥有极简的 iOS 风格 UI 交互、支持白天与黑夜模式切换，并在局域网内实现了零配置、高速的 P2P 直连文件互传。
 
 ---
@@ -26,7 +28,7 @@
 
 ## 安装与运行
 
-1. 下载最新的安装包 **`LAN Transfer_Setup_1.0.0.exe`**。
+1. 下载最新的安装包 [**`LAN_Transfer_Setup_1.0.0.exe`**](releases/LAN_Transfer_Setup_1.0.0.exe)。
 2. 双击运行，在安装向导中您可以选择安装到任意自定义路径（如 `D:\APP\LAN Transfer`）。
 3. 安装完成后，双击桌面生成的 **`LAN Transfer`** 快捷方式即可开启使用。
 

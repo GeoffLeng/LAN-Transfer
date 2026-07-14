@@ -3,5 +3,6 @@ dist/
 dist-electron/
 release/
 *.exe
+!releases/*.exe
 .DS_Store
 Thumbs.db

@@ -1,6 +1,6 @@
 {
   "name": "lan-filetransfer",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "LAN File Transfer App - LAN Transfer",
   "author": "GeoffLeng",
   "main": "dist-electron/main.js",
@@ -37,8 +37,10 @@
     }
   },
   "dependencies": {
+    "@types/qrcode": "^1.5.6",
     "bonjour-service": "^1.2.1",
     "lucide-react": "^0.344.0",
+    "qrcode": "^1.5.4",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },

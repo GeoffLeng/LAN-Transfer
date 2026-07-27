@@ -20,6 +20,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   pauseTransfer: (id: string) => ipcRenderer.invoke('pause-transfer', id),
   resumeTransfer: (id: string) => ipcRenderer.invoke('resume-transfer', id),
   cancelTransfer: (id: string) => ipcRenderer.invoke('cancel-transfer', id),
+  getWebServerStatus: () => ipcRenderer.invoke('get-web-server-status'),
+  toggleWebServer: (enable: boolean) => ipcRenderer.invoke('toggle-web-server', enable),
+  shareFileToWeb: (filePath: string) => ipcRenderer.invoke('share-file-to-web', filePath),
   
   onDeviceListUpdate: (callback: (devices: any[]) => void) => {
     const subscription = (_event: any, value: any[]) => callback(value)

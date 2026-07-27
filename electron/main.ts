@@ -4,6 +4,7 @@ import * as fs from 'fs'
 import * as net from 'net'
 import * as os from 'os'
 import Bonjour from 'bonjour-service'
+import { webServer } from './webServer'
 
 // Interface definitions
 interface Peer {
@@ -203,12 +204,12 @@ function startDiscovery() {
       sendPeerList()
     })
 
-    // Periodically sweep stale peers (older than 15s)
+    // Periodically sweep stale peers (older than 15s, excluding mobile web peers handled by SSE events)
     setInterval(() => {
       let changed = false
       const now = Date.now()
       for (const [id, peer] of activePeers.entries()) {
-        if (now - peer.lastSeen > 15000) {
+        if (!(peer as any).isMobile && now - peer.lastSeen > 15000) {
           activePeers.delete(id)
           changed = true
         }
@@ -287,9 +288,11 @@ function scanLocalNetwork() {
 }
 
 function sendPeerList() {
+  const peerList = Array.from(activePeers.values())
   if (mainWindow) {
-    mainWindow.webContents.send('device-list-update', Array.from(activePeers.values()))
+    mainWindow.webContents.send('device-list-update', peerList)
   }
+  webServer.broadcastPeers(peerList)
 }
 
 // Start TCP Server for File Reception
@@ -571,12 +574,119 @@ function startTcpServer() {
   })
 }
 
+function initWebServer() {
+  webServer.setCallbacks(
+    () => ({ nickname: myNickname, ip: myIp, avatarIndex: myAvatarIndex }),
+    () => Array.from(activePeers.values()),
+    () => saveDir
+  )
+
+  webServer.on('mobile-peer-register', (data: { ip: string }) => {
+    const peerId = `mobile-${data.ip}`
+    if (!activePeers.has(peerId)) {
+      activePeers.set(peerId, {
+        id: peerId,
+        name: `手机设备 (${data.ip.split('.').slice(-2).join('.')})`,
+        ip: data.ip,
+        port: 12139,
+        lastSeen: Date.now(),
+        avatarIndex: 0,
+        isMobile: true
+      } as any)
+      sendPeerList()
+    }
+  })
+
+  webServer.on('mobile-peer-heartbeat', (data: { ip: string }) => {
+    const peerId = `mobile-${data.ip}`
+    const existing = activePeers.get(peerId)
+    if (existing) {
+      existing.lastSeen = Date.now()
+    } else {
+      activePeers.set(peerId, {
+        id: peerId,
+        name: `手机设备 (${data.ip.split('.').slice(-2).join('.')})`,
+        ip: data.ip,
+        port: 12139,
+        lastSeen: Date.now(),
+        avatarIndex: 0,
+        isMobile: true
+      } as any)
+      sendPeerList()
+    }
+  })
+
+  webServer.on('mobile-peer-update', (data: { ip: string; nickname: string }) => {
+    const peerId = `mobile-${data.ip}`
+    const existing = activePeers.get(peerId)
+    if (existing) {
+      existing.name = data.nickname
+      existing.lastSeen = Date.now()
+    } else {
+      activePeers.set(peerId, {
+        id: peerId,
+        name: data.nickname,
+        ip: data.ip,
+        port: 12139,
+        lastSeen: Date.now(),
+        avatarIndex: 0,
+        isMobile: true
+      } as any)
+    }
+    sendPeerList()
+  })
+
+  webServer.on('mobile-peer-unregister', (data: { ip: string }) => {
+    const peerId = `mobile-${data.ip}`
+    activePeers.delete(peerId)
+    sendPeerList()
+  })
+
+  webServer.on('mobile-upload-start', (data) => {
+    if (mainWindow) {
+      mainWindow.webContents.send('incoming-transfer', {
+        id: data.id,
+        senderName: data.senderName,
+        files: [{ name: data.fileName, size: data.totalSize }],
+        totalSize: data.totalSize
+      })
+    }
+  })
+
+  webServer.on('mobile-upload-progress', (data) => {
+    if (mainWindow) {
+      mainWindow.webContents.send('transfer-progress', {
+        id: data.id,
+        direction: 'incoming',
+        progress: data.progress,
+        bytesTransferred: data.bytesTransferred,
+        totalSize: data.totalSize
+      })
+    }
+  })
+
+  webServer.on('mobile-upload-complete', (data) => {
+    if (mainWindow) {
+      mainWindow.webContents.send('transfer-progress', {
+        id: data.id,
+        direction: 'incoming',
+        progress: 1,
+        bytesTransferred: data.totalSize,
+        totalSize: data.totalSize
+      })
+    }
+  })
+
+  webServer.start(12139).catch(err => console.error('Failed to start webServer:', err))
+}
+
 // App lifecycle
 app.whenReady().then(() => {
   loadConfig()
   createWindow()
   startDiscovery()
   startTcpServer()
+  initWebServer()
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
@@ -673,6 +783,34 @@ ipcMain.handle('accept-transfer', async (_event, { id, accept }) => {
 // Send files P2P logic
 ipcMain.handle('send-files', async (_event, { targetIp, files, transferId }: { targetIp: string; files: TransferFile[]; transferId: string }) => {
   return new Promise((resolve) => {
+    // Check if target is a mobile web peer
+    const isMobilePeer = Array.from(activePeers.values()).some(p => p.ip === targetIp && (p as any).isMobile)
+    if (isMobilePeer) {
+      let totalSize = files.reduce((acc, f) => acc + f.size, 0)
+      for (const f of files) {
+        const fileId = `web-${Date.now()}-${Math.floor(Math.random() * 1000)}`
+        webServer.addPendingDownload({
+          id: fileId,
+          name: f.name,
+          size: f.size,
+          path: f.path,
+          senderName: myNickname,
+          targetIp: targetIp,
+          time: Date.now()
+        })
+      }
+      if (mainWindow) {
+        mainWindow.webContents.send('transfer-progress', {
+          id: transferId,
+          direction: 'outgoing',
+          progress: 1,
+          bytesTransferred: totalSize,
+          totalSize
+        })
+      }
+      return resolve({ success: true })
+    }
+
     const socket = new net.Socket()
     let totalSize = files.reduce((acc, f) => acc + f.size, 0)
     let totalBytesSent = 0
@@ -825,6 +963,7 @@ ipcMain.handle('get-save-dir', () => saveDir)
 ipcMain.handle('set-save-dir', (_event, dir) => {
   saveDir = dir
   saveConfig()
+  webServer.updateSaveDir(dir)
   return saveDir
 })
 ipcMain.handle('select-directory', async () => {
@@ -899,6 +1038,39 @@ ipcMain.handle('cancel-transfer', (_event, id) => {
     return true
   }
   return false
+})
+
+ipcMain.handle('get-web-server-status', () => {
+  return {
+    isRunning: webServer.getIsRunning(),
+    port: webServer.getPort(),
+    url: `http://${myIp}:${webServer.getPort()}`
+  }
+})
+
+ipcMain.handle('toggle-web-server', async (_event, enable: boolean) => {
+  if (enable) {
+    const port = await webServer.start()
+    return { isRunning: true, port, url: `http://${myIp}:${port}` }
+  } else {
+    webServer.stop()
+    return { isRunning: false, port: webServer.getPort(), url: '' }
+  }
+})
+
+ipcMain.handle('share-file-to-web', async (_event, filePath: string) => {
+  if (!fs.existsSync(filePath)) return false
+  const stat = fs.statSync(filePath)
+  const fileId = `web-${Date.now()}-${Math.floor(Math.random() * 1000)}`
+  webServer.addPendingDownload({
+    id: fileId,
+    name: path.basename(filePath),
+    size: stat.size,
+    path: filePath,
+    senderName: myNickname,
+    time: Date.now()
+  })
+  return true
 })
 
 // Window control handlers (Minimize, Maximize, Close)

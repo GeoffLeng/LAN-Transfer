@@ -3,6 +3,7 @@ import { Sidebar } from './components/Sidebar'
 import { Radar } from './components/Radar'
 import { FileList } from './components/FileList'
 import { DynamicIsland } from './components/DynamicIsland'
+import { WebShareModal } from './components/WebShareModal'
 import { 
   FileText, 
   Check, 
@@ -37,6 +38,9 @@ declare global {
       pauseTransfer: (id: string) => Promise<boolean>;
       resumeTransfer: (id: string) => Promise<boolean>;
       cancelTransfer: (id: string) => Promise<boolean>;
+      getWebServerStatus: () => Promise<{ isRunning: boolean; port: number; url: string }>;
+      toggleWebServer: (enable: boolean) => Promise<{ isRunning: boolean; port: number; url: string }>;
+      shareFileToWeb: (filePath: string) => Promise<boolean>;
       onDeviceListUpdate: (callback: (devices: any[]) => void) => () => void;
       onTransferProgress: (callback: (data: any) => void) => () => void;
       onIncomingTransfer: (callback: (data: { id: string; senderName: string; files: any[]; totalSize: number }) => void) => () => void;
@@ -113,12 +117,14 @@ export default function App() {
   const [transferState, setTransferState] = useState<any>(null)
   const [history, setHistory] = useState<TransferRecord[]>([])
   const [saveDir, setSaveDir] = useState('Downloads (下载) 目录')
+  const [isWebShareOpen, setIsWebShareOpen] = useState(false)
 
   // Tracking speed calculations
   const lastTimeRef = useRef(Date.now())
   const lastBytesRef = useRef(0)
   const lastSpeedRef = useRef(0)
   const cancelledIdsRef = useRef<Set<string>>(new Set())
+  const completedIdsRef = useRef<Set<string>>(new Set())
 
   useEffect(() => {
     // 1. Fetch info
@@ -205,9 +211,13 @@ export default function App() {
   }, [])
 
   const handleTransferComplete = (data: any, status: 'completed' | 'failed' | 'declined' | 'cancelled') => {
-    // Skip if this transfer was already cancelled
-    if (status !== 'cancelled' && cancelledIdsRef.current.has(data.id)) {
+    // Skip if this transfer was already cancelled or already completed
+    if (status !== 'cancelled' && (cancelledIdsRef.current.has(data.id) || completedIdsRef.current.has(data.id))) {
       return
+    }
+
+    if (status === 'completed') {
+      completedIdsRef.current.add(data.id)
     }
 
     // Add to history
@@ -222,7 +232,12 @@ export default function App() {
       time: new Date().toLocaleTimeString()
     }
 
-    setHistory(prev => [newRecord, ...prev])
+    setHistory(prev => {
+      if (prev.some(item => item.id === data.id)) {
+        return prev
+      }
+      return [newRecord, ...prev]
+    })
 
     if (status === 'cancelled') {
       // Immediately clear everything synchronously
@@ -446,6 +461,7 @@ export default function App() {
             myAvatarIndex={myAvatarIndex}
             myIp={myIp}
             hasActiveTransfer={hasActiveTransfer}
+            onOpenWebShare={() => setIsWebShareOpen(true)}
           />
 
           {/* Tab Pages */}
@@ -809,6 +825,11 @@ export default function App() {
           </div>
         </div>
 
+        {/* Web Share QR Modal */}
+        <WebShareModal 
+          isOpen={isWebShareOpen} 
+          onClose={() => setIsWebShareOpen(false)} 
+        />
       </div>
     </div>
   )

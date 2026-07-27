@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { Laptop, Search } from 'lucide-react'
+import { Laptop, Search, Smartphone } from 'lucide-react'
 import { ShibaAvatar } from './ShibaAvatar'
 
 interface Device {
@@ -8,6 +8,7 @@ interface Device {
   ip: string
   port: number
   avatarIndex: number
+  isMobile?: boolean
 }
 
 interface RadarProps {
@@ -53,19 +54,28 @@ export const Radar: React.FC<RadarProps> = ({ devices, onSelectDevice, onDirectC
             <button
               key={device.id}
               onClick={() => onSelectDevice(device)}
-              className="liquid-glass-card p-5 rounded-xl flex flex-col items-center justify-center text-center cursor-pointer select-none group border border-white/10 w-full"
+              className="liquid-glass-card p-5 rounded-xl flex flex-col items-center justify-center text-center cursor-pointer select-none group border border-white/10 w-full relative"
             >
               {/* Avatar Container with glowing hover */}
               <div className="relative w-16 h-16 rounded-lg bg-white/5 flex items-center justify-center border border-white/10 shadow-md mb-4 group-hover:scale-105 transition-transform duration-300">
-                <ShibaAvatar index={device.avatarIndex} size={54} />
+                {device.isMobile ? (
+                  <div className="w-full h-full flex items-center justify-center text-sky-400">
+                    <Smartphone className="w-8 h-8" />
+                  </div>
+                ) : (
+                  <ShibaAvatar index={device.avatarIndex} size={54} />
+                )}
                 <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 border-2 border-[#121214] rounded-full"></div>
               </div>
               
               {/* Device Text */}
-              <h3 className="font-semibold text-sm text-white group-hover:text-blue-300 transition-colors duration-300 truncate max-w-full">
-                {device.name}
-              </h3>
-              <p className="text-[10px] text-white/50 font-mono mt-1">{device.ip}</p>
+              <div className="flex items-center gap-1 max-w-full">
+                {device.isMobile && <span className="text-xs">📱</span>}
+                <h3 className="font-semibold text-sm text-white group-hover:text-blue-300 transition-colors duration-300 truncate max-w-full">
+                  {device.name}
+                </h3>
+              </div>
+              <p className="text-[10px] text-sky-400 font-mono mt-1 font-semibold">{device.ip}</p>
               
               {/* Tap to send prompt */}
               <span className="text-[9px] bg-blue-500/20 text-blue-300 border border-blue-500/30 px-2 py-0.5 rounded-full mt-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300">

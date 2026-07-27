@@ -1,5 +1,5 @@
 import React from 'react'
-import { Send, History, Settings, ArrowRightLeft } from 'lucide-react'
+import { Send, History, Settings, ArrowRightLeft, Smartphone } from 'lucide-react'
 import { ShibaAvatar } from './ShibaAvatar'
 import logoImg from '../../logo.png'
 
@@ -10,6 +10,7 @@ interface SidebarProps {
   myAvatarIndex: number
   myIp: string
   hasActiveTransfer?: boolean
+  onOpenWebShare?: () => void
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -18,7 +19,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   myNickname,
   myAvatarIndex,
   myIp,
-  hasActiveTransfer
+  hasActiveTransfer,
+  onOpenWebShare
 }) => {
   return (
     <div className="w-64 liquid-glass-sidebar flex flex-col justify-between h-full p-6 text-white select-none border-r border-white/10">
@@ -88,6 +90,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <Settings className="w-4 h-4" />
             <span>系统设置</span>
           </button>
+
+          {onOpenWebShare && (
+            <button
+              onClick={onOpenWebShare}
+              className="w-full flex items-center gap-3 px-4 py-3 mt-4 bg-gradient-to-r from-sky-500/20 to-blue-500/20 hover:from-sky-500/30 hover:to-blue-500/30 border border-sky-500/30 text-sky-300 font-medium text-sm rounded-xl transition shadow-lg shadow-sky-500/10"
+            >
+              <Smartphone className="w-4 h-4 text-sky-400" />
+              <span>手机扫码互传</span>
+            </button>
+          )}
         </nav>
       </div>
 

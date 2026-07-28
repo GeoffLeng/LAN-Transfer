@@ -41,6 +41,7 @@ declare global {
       getWebServerStatus: () => Promise<{ isRunning: boolean; port: number; url: string }>;
       toggleWebServer: (enable: boolean) => Promise<{ isRunning: boolean; port: number; url: string }>;
       shareFileToWeb: (filePath: string) => Promise<boolean>;
+      startSpeedTest: (targetIp: string) => Promise<{ success: boolean; speedMbps?: number; error?: string }>;
       onDeviceListUpdate: (callback: (devices: any[]) => void) => () => void;
       onTransferProgress: (callback: (data: any) => void) => () => void;
       onIncomingTransfer: (callback: (data: { id: string; senderName: string; files: any[]; totalSize: number }) => void) => () => void;
@@ -118,6 +119,7 @@ export default function App() {
   const [history, setHistory] = useState<TransferRecord[]>([])
   const [saveDir, setSaveDir] = useState('Downloads (下载) 目录')
   const [isWebShareOpen, setIsWebShareOpen] = useState(false)
+  const [speedTestState, setSpeedTestState] = useState<{ isRunning: boolean; speedMbps?: number; progress?: number; targetIp?: string } | null>(null)
 
   // Tracking speed calculations
   const lastTimeRef = useRef(Date.now())
@@ -125,6 +127,23 @@ export default function App() {
   const lastSpeedRef = useRef(0)
   const cancelledIdsRef = useRef<Set<string>>(new Set())
   const completedIdsRef = useRef<Set<string>>(new Set())
+
+  const handleStartSpeedTest = async (targetIp: string) => {
+    setSpeedTestState({ isRunning: true, progress: 0, speedMbps: 0, targetIp })
+    
+    const res = await window.electronAPI.startSpeedTest(targetIp)
+    if (res.success && res.speedMbps !== undefined) {
+      setSpeedTestState(prev => ({
+        ...prev,
+        isRunning: false,
+        progress: 1,
+        speedMbps: res.speedMbps
+      }))
+    } else {
+      setSpeedTestState(null)
+      alert(`测速失败: ${res.error || '握手超时或网络中断'}`)
+    }
+  }
 
   useEffect(() => {
     // 1. Fetch info
@@ -148,6 +167,16 @@ export default function App() {
 
     // 4. Setup progress listener
     const unsubscribeProgress = window.electronAPI.onTransferProgress((data) => {
+      if (data.isSpeedTest) {
+        setSpeedTestState(prev => ({
+          ...prev,
+          isRunning: true,
+          progress: data.progress,
+          speedMbps: data.currentMbps || 0
+        }))
+        return
+      }
+
       // Skip ALL events for transfers that have been cancelled
       if (cancelledIdsRef.current.has(data.id)) {
         return
@@ -469,7 +498,7 @@ export default function App() {
             
             {/* 1. SEND VIEW */}
             {activeTab === 'send' && (
-              <Radar devices={devices} onSelectDevice={handleSelectDevice} onDirectConnect={handleDirectConnect} />
+              <Radar devices={devices} onSelectDevice={handleSelectDevice} onDirectConnect={handleDirectConnect} onSpeedTest={handleStartSpeedTest} />
             )}
 
             {/* 2. HISTORY VIEW */}
@@ -830,6 +859,82 @@ export default function App() {
           isOpen={isWebShareOpen} 
           onClose={() => setIsWebShareOpen(false)} 
         />
+
+        {/* Speedtest Dashboard Modal (Adaptive Light/Dark Theme, No Spin Circle, Big Rolling Mbps) */}
+        {speedTestState && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-50 p-4 select-none">
+            <div className={`rounded-3xl p-6 w-full max-w-sm flex flex-col items-center text-center shadow-2xl relative overflow-hidden border transition-colors duration-300 ${
+              theme === 'dark' ? 'bg-[#1e293b] border-white/10 text-white' : 'bg-white border-gray-200 text-slate-900 shadow-xl'
+            }`}>
+              <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 rounded-full blur-2xl pointer-events-none"></div>
+              
+              {/* Header */}
+              <h3 className={`font-extrabold text-base mb-1 flex items-center gap-2 ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                <span>🚀 局域网通道测速</span>
+              </h3>
+              <p className={`text-xs mb-4 ${theme === 'dark' ? 'text-white/60' : 'text-slate-500'}`}>
+                目标设备: <span className="font-mono font-semibold text-sky-500">{speedTestState.targetIp}</span> (纯网络吞吐，无磁盘写入)
+              </p>
+              
+              {/* Speed Display Card (No Spinner Circle) */}
+              <div className={`w-full py-5 px-4 rounded-2xl mb-4 border flex flex-col items-center justify-center ${
+                theme === 'dark' ? 'bg-[#0f172a] border-white/5' : 'bg-slate-50 border-slate-200'
+              }`}>
+                <span className={`text-[10px] font-semibold uppercase tracking-wider mb-1 ${theme === 'dark' ? 'text-white/40' : 'text-slate-400'}`}>
+                  {speedTestState.isRunning ? '实时物理带宽 (Real-time)' : '最终平均带宽 (Average Bandwidth)'}
+                </span>
+                <div className="flex items-baseline gap-1.5 my-1">
+                  <span className="text-4xl font-black font-mono text-sky-500 tracking-tight">
+                    {(speedTestState.speedMbps || 0).toFixed(1)}
+                  </span>
+                  <span className="text-sm font-bold text-sky-400">Mbps</span>
+                </div>
+                <span className={`text-[10px] font-mono ${theme === 'dark' ? 'text-white/40' : 'text-slate-400'}`}>
+                  约 {((speedTestState.speedMbps || 0) / 8).toFixed(1)} MB/s
+                </span>
+              </div>
+
+              {/* Progress Line */}
+              <div className={`w-full h-2 rounded-full overflow-hidden mb-4 ${theme === 'dark' ? 'bg-white/10' : 'bg-slate-200'}`}>
+                <div 
+                  className="bg-gradient-to-r from-sky-500 to-blue-600 h-full transition-all duration-150" 
+                  style={{ width: `${(speedTestState.progress || 0) * 100}%` }}
+                ></div>
+              </div>
+
+              {/* Dynamic Status & Diagnostics */}
+              {speedTestState.isRunning ? (
+                <p className="text-xs text-sky-400 animate-pulse font-medium mb-2">⚡ 全速多通道吞吐测流中，请稍候...</p>
+              ) : (
+                <div className="flex flex-col items-center gap-4 w-full">
+                  {/* Performance Diagnostics Box */}
+                  <div className={`text-left text-[11px] p-3 rounded-xl border leading-relaxed ${
+                    (speedTestState.speedMbps || 0) < 220
+                      ? 'bg-amber-500/10 border-amber-500/30 text-amber-500'
+                      : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-500'
+                  }`}>
+                    {(speedTestState.speedMbps || 0) < 220 ? (
+                      <div>
+                        <p className="font-bold mb-1">⚠️ 局域网带宽偏低 (约 {((speedTestState.speedMbps || 0)).toFixed(0)} Mbps) 排查建议：</p>
+                        <p>1. <strong>代理/梯子卡顿</strong>：请关闭梯子/TUN代理软件（代理软件常限制本地回环吞吐在 20MB/s 左右）。</p>
+                        <p className="mt-0.5">2. <strong>WiFi频段</strong>：确认电脑与手机连接的是 5GHz WiFi，避开 2.4GHz。</p>
+                      </div>
+                    ) : (
+                      <p className="font-semibold text-center">⚡ 良好 5GHz WiFi / 千兆局域网通道！传输速度优异。</p>
+                    )}
+                  </div>
+
+                  <button
+                    onClick={() => setSpeedTestState(null)}
+                    className="w-full bg-blue-600 hover:bg-blue-500 active:scale-95 text-white font-bold text-xs py-2.5 rounded-xl border border-white/10 transition-all duration-200 shadow-lg shadow-blue-500/20"
+                  >
+                    确定
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

@@ -307,11 +307,21 @@ function startTcpServer() {
     let filesMetadata: any[] = []
     let totalBytesReceived = 0
     let totalSize = 0
+    let isSpeedTest = false
     let buffer = Buffer.alloc(0)
     let currentFileExpectedSize = 0
     let lastIpcTime = 0
 
     socket.on('data', (chunk) => {
+      if (isSpeedTest) {
+        totalBytesReceived += chunk.length
+        if (totalBytesReceived >= totalSize) {
+          socket.write(JSON.stringify({ status: 'complete' }))
+          socket.destroy()
+        }
+        return
+      }
+
       let offset = 0
       while (offset < chunk.length) {
         if (fileStream) {
@@ -482,10 +492,27 @@ function startTcpServer() {
                 }
 
                 transferId = metadata.id
-                filesMetadata = metadata.files
                 totalSize = metadata.totalSize
                 const senderName = metadata.senderName
                 const senderIp = socket.remoteAddress?.replace('::ffff:', '') || ''
+
+                if (metadata.type === 'speed-test') {
+                  isSpeedTest = true
+                  isAccepted = true
+                  activeIncomingTransfers.set(transferId, {
+                    socket,
+                    files: [],
+                    senderName,
+                    senderIp,
+                    isPaused: false,
+                    totalBytesReceived: 0,
+                    totalSize
+                  })
+                  socket.write(JSON.stringify({ status: 'accepted' }))
+                  return
+                }
+
+                filesMetadata = metadata.files
 
                 activeIncomingTransfers.set(transferId, {
                   socket,
@@ -545,7 +572,7 @@ function startTcpServer() {
                   fs.mkdirSync(destDir, { recursive: true })
                 }
 
-                fileStream = fs.createWriteStream(destPath)
+                fileStream = fs.createWriteStream(destPath, { highWaterMark: 1024 * 1024 * 4 })
               } catch (e) {
                 console.error('Failed to parse file header:', e)
                 socket.destroy()
@@ -682,6 +709,11 @@ function initWebServer() {
 
 // App lifecycle
 app.whenReady().then(() => {
+  try {
+    os.setPriority(os.constants.priority.PRIORITY_HIGH)
+  } catch (e) {
+    // Ignore priority errors on unsupported OS permissions
+  }
   loadConfig()
   createWindow()
   startDiscovery()
@@ -778,6 +810,89 @@ ipcMain.handle('accept-transfer', async (_event, { id, accept }) => {
     activeIncomingTransfers.delete(id)
   }
   return true
+})
+
+ipcMain.handle('start-speed-test', async (_event, { targetIp }: { targetIp: string }) => {
+  return new Promise((resolve) => {
+    const socket = new net.Socket()
+    const transferId = `speedtest-${Date.now()}`
+    const totalSize = 120 * 1024 * 1024 // 120MB 测速上限
+    let totalBytesSent = 0
+    let lastIpcTime = 0
+    let startTime = Date.now()
+
+    socket.connect(PORT, targetIp, () => {
+      socket.setNoDelay(true)
+      const handshake = JSON.stringify({
+        type: 'speed-test',
+        id: transferId,
+        senderName: myNickname,
+        totalSize
+      })
+      const sizeBuf = Buffer.alloc(4)
+      sizeBuf.writeInt32BE(Buffer.byteLength(handshake))
+      socket.write(Buffer.concat([sizeBuf, Buffer.from(handshake, 'utf-8')]))
+    })
+
+    socket.on('data', (data) => {
+      let response
+      try {
+        response = JSON.parse(data.toString('utf-8'))
+      } catch {
+        socket.destroy()
+        resolve({ success: false, error: 'Invalid response' })
+        return
+      }
+
+      if (response.status === 'accepted') {
+        const testChunk = Buffer.alloc(2 * 1024 * 1024) // 2MB
+        startTime = Date.now()
+
+        const pump = () => {
+          if (totalBytesSent >= totalSize) {
+            return
+          }
+          const payload = testChunk.subarray(0, Math.min(testChunk.length, totalSize - totalBytesSent))
+          const canWrite = socket.write(payload)
+          totalBytesSent += payload.length
+
+          const now = Date.now()
+          if (now - lastIpcTime > 150 || totalBytesSent === totalSize) {
+            lastIpcTime = now
+            const elapsedTime = (now - startTime) / 1000 || 0.1
+            const currentMbps = ((totalBytesSent * 8) / 1024 / 1024) / elapsedTime
+            if (mainWindow) {
+              mainWindow.webContents.send('transfer-progress', {
+                id: transferId,
+                direction: 'outgoing',
+                isSpeedTest: true,
+                progress: totalBytesSent / totalSize,
+                currentMbps: currentMbps,
+                bytesTransferred: totalBytesSent,
+                totalSize
+              })
+            }
+          }
+
+          if (canWrite) {
+            process.nextTick(pump)
+          } else {
+            socket.once('drain', pump)
+          }
+        }
+        pump()
+      } else if (response.status === 'complete') {
+        const duration = (Date.now() - startTime) / 1000 || 0.1
+        const avgMbps = ((totalBytesSent * 8) / 1024 / 1024) / duration
+        socket.destroy()
+        resolve({ success: true, speedMbps: avgMbps })
+      }
+    })
+
+    socket.on('error', (err) => {
+      resolve({ success: false, error: err.message })
+    })
+  })
 })
 
 // Send files P2P logic
@@ -879,8 +994,8 @@ ipcMain.handle('send-files', async (_event, { targetIp, files, transferId }: { t
         lenBuf.writeInt32BE(Buffer.byteLength(header))
         clientSocket.write(Buffer.concat([lenBuf, Buffer.from(header, 'utf-8')]))
 
-        // 2. Stream file data with 512KB chunk buffer
-        const readStream = fs.createReadStream(file.path, { highWaterMark: 1024 * 512 })
+        // 2. Stream file data with 2MB chunk buffer for maximum TCP throughput
+        const readStream = fs.createReadStream(file.path, { highWaterMark: 1024 * 1024 * 2 })
         
         const entry = activeOutgoings.get(transferId)
         if (entry) {
@@ -924,10 +1039,14 @@ ipcMain.handle('send-files', async (_event, { targetIp, files, transferId }: { t
 
     socket.on('error', (err) => {
       console.error('Sender socket error:', err)
+      const entry = activeOutgoings.get(transferId)
+      if (entry && entry.readStream) entry.readStream.destroy()
       resolveWithCleanup({ success: false, error: err.message })
     })
 
     socket.on('close', () => {
+      const entry = activeOutgoings.get(transferId)
+      if (entry && entry.readStream) entry.readStream.destroy()
       resolveWithCleanup({ success: false, error: 'Connection closed' })
     })
   })

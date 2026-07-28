@@ -23,6 +23,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getWebServerStatus: () => ipcRenderer.invoke('get-web-server-status'),
   toggleWebServer: (enable: boolean) => ipcRenderer.invoke('toggle-web-server', enable),
   shareFileToWeb: (filePath: string) => ipcRenderer.invoke('share-file-to-web', filePath),
+  startSpeedTest: (targetIp: string) => ipcRenderer.invoke('start-speed-test', { targetIp }),
   
   onDeviceListUpdate: (callback: (devices: any[]) => void) => {
     const subscription = (_event: any, value: any[]) => callback(value)

@@ -1,10 +1,10 @@
 # 🚀 LAN Transfer - 极速局域网文件传输工具
 
-![GitHub release](https://img.shields.io/badge/Release-v1.1.0-blue.svg)
+![GitHub release](https://img.shields.io/badge/Release-v1.2.0-blue.svg)
 ![Platform](https://img.shields.io/badge/Platform-Windows-orange.svg)
 ![License](https://img.shields.io/badge/License-MIT-green.svg)
 
-[![Download Windows EXE](https://img.shields.io/badge/Download-Windows_EXE-blue?style=for-the-badge&logo=windows&logoColor=white)](releases/LAN%20Transfer_Setup_1.1.0.exe)
+[![Download Windows EXE](https://img.shields.io/badge/Download-Windows_EXE-blue?style=for-the-badge&logo=windows&logoColor=white)](releases/LAN%20Transfer_Setup_1.2.0.exe)
 
 **LAN Transfer** 是一款基于 Electron + React + TypeScript + Vite + Tailwind CSS 构建的高颜值局域网文件传输工具。不仅支持 PC 客户端间极速 P2P 文件互传，还支持**手机免安装 APP 扫码一键互传**，在局域网内实现零配置、多端全平台文件传输体验。
 
@@ -20,11 +20,12 @@
 
 ## 核心特性
 
-- **📱 手机免安装 APP 扫码互传 (v1.1.0 新增)**：开启网页共享服务，手机连接同一 WiFi 扫描二维码即可在浏览器中与 PC 或其它设备互发文件，完美适配 iOS Safari 与 Android Chrome。
-- **⚡ 极速 P2P 传输**：局域网内点对点直接建立 TCP/Stream 高速通道，传输速度仅受物理网卡和路由器带宽限制。
+- **🚀 零磁盘 IO 局域网通道纯网络测速 (v1.2.0 新增)**：支持一键对 PC 或手机进行物理带宽网速测试，采用内存复用 Buffer 不写磁盘，精细显示实时 Mbps 滚牌与网络瓶颈诊断提示。
+- **📱 手机免安装 APP 扫码互传**：开启网页共享服务，手机连接同一 WiFi 扫描二维码即可在浏览器中与 PC 或其它设备互发文件，完美适配 iOS Safari 与 Android Chrome。
+- **⚡ 极速 P2P 传输与 4MB 写缓冲**：局域网内点对点直接建立 TCP 高速通道，内部扩展 4MB 内存写缓冲与背压控制，大幅降低磁盘寻道阻塞。
 - **🔍 动态设备感知与雷达图**：集成 mDNS 组播广播与局域网段 TCP 轮询，打开软件即刻自动扫描显示周围所有在线电脑与手机，支持显示局域网 IP 与一键点击发送。
-- **🔒 目标设备隐私隔离防护**：针对多设备并发情况实现精准的目标 IP 隔离传输，防止接收文件误发或泄漏；包含防目录穿越安全策略。
-- **🎨 灵动岛状态与多主题交互**：基于 iOS 灵动岛风格的状态监控，支持实时速率/剩余时间计算、暂停/恢复/取消控制，支持白天与黑夜主题自由切换。
+- **🔒 目标设备隐私隔离防护**：针对多设备并发情况实现精准的目标 IP 隔离传输，被测速设备保持绝对静默，防止接收文件误发或泄漏；包含防目录穿越安全策略。
+- **🎨 灵动岛状态与多主题交互**：基于 iOS 灵动岛风格的状态监控，支持实时速率/剩余时间计算、白天与黑夜高对比度主题自由切换。
 
 ---
 
@@ -34,12 +35,12 @@
 
 您可以选择以下方式下载 Windows 客户端安装包：
 
-- [**`LAN Transfer_Setup_1.1.0.exe` (最新稳定版)**](releases/LAN%20Transfer_Setup_1.1.0.exe)
+- [**`LAN Transfer_Setup_1.2.0.exe` (最新稳定版)**](releases/LAN%20Transfer_Setup_1.2.0.exe)
 - [查看所有历史发行版本 (Releases 页面)](../../releases)
 
 ### 💿 安装步骤
 
-1. 点击上述链接下载最新的安装包 [**`LAN Transfer_Setup_1.1.0.exe`**](releases/LAN%20Transfer_Setup_1.1.0.exe)。
+1. 点击上述链接下载最新的安装包 [**`LAN Transfer_Setup_1.2.0.exe`**](releases/LAN%20Transfer_Setup_1.2.0.exe)。
 2. 双击运行，在安装向导中您可以选择安装到任意自定义路径（如 `D:\Program Files\LAN Transfer`）。
 3. 安装完成后，双击桌面生成的 **`LAN Transfer`** 快捷方式即可开启使用。
 4. 如需与手机互传，点击侧边栏 **“手机扫码互传”**，使用手机扫码即可使用。

@@ -152,6 +152,53 @@ class WebServerManager extends EventEmitter {
           return
         }
 
+        // Speedtest Endpoint (Exclude Disk I/O, pure RAM transmission)
+        if (url.pathname === '/api/speedtest') {
+          if (req.method === 'POST') {
+            let totalBytes = 0
+            req.on('data', chunk => { totalBytes += chunk.length })
+            req.on('end', () => {
+              res.writeHead(200, { 'Content-Type': 'application/json' })
+              res.end(JSON.stringify({ success: true, received: totalBytes }))
+            })
+            req.on('error', () => {
+              res.writeHead(500)
+              res.end()
+            })
+          } else if (req.method === 'GET' || req.method === 'HEAD') {
+            const totalSize = 50 * 1024 * 1024 // 50MB
+            res.writeHead(200, {
+              'Content-Type': 'application/octet-stream',
+              'Content-Length': totalSize.toString()
+            })
+            if (req.method === 'HEAD') {
+              res.end()
+              return
+            }
+
+            const zeroChunk = Buffer.alloc(1024 * 1024 * 2) // 2MB
+            let bytesSent = 0
+            
+            const pump = () => {
+              if (bytesSent >= totalSize) {
+                res.end()
+                return
+              }
+              const chunkToSend = zeroChunk.subarray(0, Math.min(zeroChunk.length, totalSize - bytesSent))
+              const canWrite = res.write(chunkToSend)
+              bytesSent += chunkToSend.length
+
+              if (canWrite) {
+                process.nextTick(pump)
+              } else {
+                res.once('drain', pump)
+              }
+            }
+            pump()
+          }
+          return
+        }
+
         // 4. Upload Endpoint (Mobile -> Desktop / Relay)
         if (url.pathname === '/api/upload' && req.method === 'POST') {
           this.handleUpload(req, res)
@@ -245,7 +292,7 @@ class WebServerManager extends EventEmitter {
     }
 
     const destPath = path.join(currentSaveDir, safeName)
-    const writeStream = fs.createWriteStream(destPath)
+    const writeStream = fs.createWriteStream(destPath, { highWaterMark: 1024 * 1024 * 4 })
 
     let received = 0
     let lastIpcTime = 0
@@ -411,6 +458,18 @@ class WebServerManager extends EventEmitter {
     <div id="deviceList" class="device-grid">
       <div style="font-size:13px; color:#64748b; text-align:center; padding:12px;">正在搜索局域网设备...</div>
     </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">
+      <span>🚀 局域网通道测速</span>
+      <span style="font-size:11px; font-weight:normal; color:#64748b;">测试手机与电脑间网速</span>
+    </div>
+    <div style="display:flex; gap:8px;">
+      <button onclick="runUploadSpeedTest()" style="flex:1; background:rgba(56,189,248,0.1); color:#38bdf8; border:1px solid rgba(56,189,248,0.3); padding:8px; border-radius:8px; font-size:13px; font-weight:600; cursor:pointer;">测试上传网速</button>
+      <button onclick="runDownloadSpeedTest()" style="flex:1; background:rgba(16,185,129,0.1); color:#10b981; border:1px solid rgba(16,185,129,0.3); padding:8px; border-radius:8px; font-size:13px; font-weight:600; cursor:pointer;">测试下载网速</button>
+    </div>
+    <div id="speedResult" style="margin-top:12px; font-size:13px; text-align:center; color:#94a3b8; display:none; background:#0f172a; padding:8px; border-radius:8px; border:1px solid #334155;"></div>
   </div>
 
   <input type="file" id="fileInput" class="file-input" multiple onchange="uploadFiles(this.files)">
@@ -648,6 +707,45 @@ class WebServerManager extends EventEmitter {
       return str.replace(/[&<>"']/g, function(m) {
         return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[m];
       });
+    }
+
+    async function runUploadSpeedTest() {
+      const el = document.getElementById('speedResult');
+      el.style.display = 'block';
+      el.innerHTML = '⚡ 正在上传测速中...';
+      const dataSize = 25 * 1024 * 1024; // 25MB
+      const data = new Blob([new Uint8Array(dataSize)]);
+      const startTime = Date.now();
+      try {
+        await fetch('/api/speedtest', { method: 'POST', body: data });
+        const duration = (Date.now() - startTime) / 1000 || 0.1;
+        const speed = (dataSize / 1024 / 1024) / duration;
+        el.innerHTML = '📤 上传速度：<strong>' + speed.toFixed(1) + ' MB/s</strong> (约 ' + (speed * 8).toFixed(0) + ' Mbps)';
+      } catch (e) {
+        el.innerHTML = '❌ 测速失败，请检查网络';
+      }
+    }
+
+    async function runDownloadSpeedTest() {
+      const el = document.getElementById('speedResult');
+      el.style.display = 'block';
+      el.innerHTML = '⚡ 正在下载测速中...';
+      const startTime = Date.now();
+      let loaded = 0;
+      try {
+        const res = await fetch('/api/speedtest');
+        const reader = res.body.getReader();
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          loaded += value.length;
+        }
+        const duration = (Date.now() - startTime) / 1000 || 0.1;
+        const speed = (loaded / 1024 / 1024) / duration;
+        el.innerHTML = '📥 下载速度：<strong>' + speed.toFixed(1) + ' MB/s</strong> (约 ' + (speed * 8).toFixed(0) + ' Mbps)';
+      } catch (e) {
+        el.innerHTML = '❌ 测速失败，请检查网络';
+      }
     }
   </script>
 </body>

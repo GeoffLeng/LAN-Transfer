@@ -1,8 +1,12 @@
 {
   "name": "lan-filetransfer",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "LAN File Transfer App - LAN Transfer",
   "author": "GeoffLeng",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/GeoffLeng/LAN-Transfer.git"
+  },
   "main": "dist-electron/main.js",
   "scripts": {
     "dev": "vite",
@@ -11,6 +15,7 @@
   "build": {
     "appId": "com.transfer",
     "productName": "LAN Transfer",
+    "publish": null,
     "directories": {
       "output": "release"
     },

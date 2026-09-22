@@ -126,10 +126,10 @@
 }
 
 /* Window control bar icons in light mode */
-.theme-light .bg-white {
+.theme-light .titlebar-no-drag .bg-white {
   background-color: rgba(15, 23, 42, 0.85) !important;
 }
-.theme-light .border-white {
+.theme-light .titlebar-no-drag .border-white {
   border-color: rgba(15, 23, 42, 0.85) !important;
 }
 
@@ -164,17 +164,26 @@
   color: #ffffff !important;
 }
 
-/* Semi-transparent colored tags — keep their intended colors */
+/* Semi-transparent colored tags — keep their intended colors with accessible contrast */
 .theme-light .text-blue-400 { color: #2563eb !important; }
+.theme-light .text-blue-300 { color: #2563eb !important; }
+.theme-light .text-blue-200 { color: #1d4ed8 !important; }
+.theme-light .text-sky-400 { color: #0284c7 !important; }
+.theme-light .text-sky-300 { color: #0369a1 !important; }
 .theme-light .text-green-400 { color: #16a34a !important; }
+.theme-light .text-green-300 { color: #16a34a !important; }
+.theme-light .text-emerald-400 { color: #059669 !important; }
+.theme-light .text-emerald-300 { color: #047857 !important; }
+.theme-light .text-emerald-200 { color: #047857 !important; }
 .theme-light .text-yellow-400 { color: #ca8a04 !important; }
 .theme-light .text-red-400,
 .theme-light .text-red-300 { color: #dc2626 !important; }
-.theme-light .text-green-300 { color: #16a34a !important; }
 .theme-light .text-indigo-400 { color: #4f46e5 !important; }
 
 /* Tag badge backgrounds — darken slightly for light bg readability */
-.theme-light .bg-blue-500\/10 { background-color: rgba(59, 130, 246, 0.12) !important; }
+.theme-light .bg-blue-500\/10,
+.theme-light .bg-blue-600\/30 { background-color: rgba(37, 99, 235, 0.12) !important; }
+.theme-light .bg-emerald-600\/30 { background-color: rgba(5, 150, 105, 0.12) !important; }
 .theme-light .bg-green-500\/10 { background-color: rgba(34, 197, 94, 0.12) !important; }
 .theme-light .bg-green-500\/20 { background-color: rgba(34, 197, 94, 0.15) !important; }
 .theme-light .bg-yellow-500\/20 { background-color: rgba(234, 179, 8, 0.15) !important; }
@@ -182,10 +191,18 @@
 .theme-light .bg-red-600\/20 { background-color: rgba(220, 38, 38, 0.12) !important; }
 
 /* Border colors for tags */
-.theme-light .border-blue-500\/20 { border-color: rgba(59, 130, 246, 0.2) !important; }
+.theme-light .border-blue-500\/20,
+.theme-light .border-blue-500\/40 { border-color: rgba(37, 99, 235, 0.25) !important; }
+.theme-light .border-emerald-500\/40 { border-color: rgba(5, 150, 105, 0.25) !important; }
 .theme-light .border-green-500\/30 { border-color: rgba(34, 197, 94, 0.25) !important; }
 .theme-light .border-yellow-500\/30 { border-color: rgba(234, 179, 8, 0.25) !important; }
 .theme-light .border-red-500\/30 { border-color: rgba(239, 68, 68, 0.25) !important; }
+
+/* Avatar letters preserve pure white in light mode */
+.theme-light [class*="bg-gradient-avatar-"],
+.theme-light [class*="bg-gradient-avatar-"] * {
+  color: #ffffff !important;
+}
 
 /* iOS 26 Liquid Glass Effects */
 .liquid-glass-panel {

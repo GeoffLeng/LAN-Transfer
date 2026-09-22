@@ -13,7 +13,9 @@ import {
   XCircle,
   History as HistoryIcon,
   Play,
-  Pause
+  Pause,
+  X,
+  AlertTriangle
 } from 'lucide-react'
 import { ShibaAvatar } from './components/ShibaAvatar'
 
@@ -120,6 +122,7 @@ export default function App() {
   const [saveDir, setSaveDir] = useState('Downloads (下载) 目录')
   const [isWebShareOpen, setIsWebShareOpen] = useState(false)
   const [speedTestState, setSpeedTestState] = useState<{ isRunning: boolean; speedMbps?: number; progress?: number; targetIp?: string } | null>(null)
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false)
 
   // Tracking speed calculations
   const lastTimeRef = useRef(Date.now())
@@ -128,21 +131,40 @@ export default function App() {
   const cancelledIdsRef = useRef<Set<string>>(new Set())
   const completedIdsRef = useRef<Set<string>>(new Set())
 
+  const speedTestCancelledRef = useRef(false)
+
+  const requestCancelTransfer = () => {
+    if (!transferState) return
+    setShowCancelConfirm(true)
+  }
+
   const handleStartSpeedTest = async (targetIp: string) => {
+    speedTestCancelledRef.current = false
     setSpeedTestState({ isRunning: true, progress: 0, speedMbps: 0, targetIp })
     
     const res = await window.electronAPI.startSpeedTest(targetIp)
+    if (speedTestCancelledRef.current) {
+      return
+    }
     if (res.success && res.speedMbps !== undefined) {
-      setSpeedTestState(prev => ({
-        ...prev,
-        isRunning: false,
-        progress: 1,
-        speedMbps: res.speedMbps
-      }))
+      setSpeedTestState(prev => {
+        if (!prev) return null
+        return {
+          ...prev,
+          isRunning: false,
+          progress: 1,
+          speedMbps: res.speedMbps
+        }
+      })
     } else {
       setSpeedTestState(null)
       alert(`测速失败: ${res.error || '握手超时或网络中断'}`)
     }
+  }
+
+  const handleCloseSpeedTest = () => {
+    speedTestCancelledRef.current = true
+    setSpeedTestState(null)
   }
 
   useEffect(() => {
@@ -168,12 +190,15 @@ export default function App() {
     // 4. Setup progress listener
     const unsubscribeProgress = window.electronAPI.onTransferProgress((data) => {
       if (data.isSpeedTest) {
-        setSpeedTestState(prev => ({
-          ...prev,
-          isRunning: true,
-          progress: data.progress,
-          speedMbps: data.currentMbps || 0
-        }))
+        setSpeedTestState(prev => {
+          if (!prev) return null
+          return {
+            ...prev,
+            isRunning: true,
+            progress: data.progress,
+            speedMbps: data.currentMbps || 0
+          }
+        })
         return
       }
 
@@ -449,21 +474,27 @@ export default function App() {
           <div className="titlebar-no-drag flex items-center h-full">
             <button 
               onClick={() => window.electronAPI.minimizeWindow()}
-              className="w-12 h-12 flex items-center justify-center text-white/70 hover:bg-white/10 transition-colors duration-150"
+              className={`w-12 h-12 flex items-center justify-center transition-colors duration-150 ${
+                theme === 'light' ? 'text-slate-600 hover:bg-black/5' : 'text-white/70 hover:bg-white/10'
+              }`}
               title="最小化"
             >
-              <span className="w-3.5 h-[1.5px] bg-white"></span>
+              <span className={`w-3.5 h-[1.5px] ${theme === 'light' ? 'bg-slate-700' : 'bg-white'}`}></span>
             </button>
             <button 
               onClick={() => window.electronAPI.maximizeWindow()}
-              className="w-12 h-12 flex items-center justify-center text-white/70 hover:bg-white/10 transition-colors duration-150"
+              className={`w-12 h-12 flex items-center justify-center transition-colors duration-150 ${
+                theme === 'light' ? 'text-slate-600 hover:bg-black/5' : 'text-white/70 hover:bg-white/10'
+              }`}
               title="最大化"
             >
-              <span className="w-3 h-3 border border-white bg-transparent"></span>
+              <span className={`w-3 h-3 border bg-transparent ${theme === 'light' ? 'border-slate-700' : 'border-white'}`}></span>
             </button>
             <button 
               onClick={() => window.electronAPI.closeWindow()}
-              className="w-12 h-12 flex items-center justify-center text-white/70 hover:bg-red-600 hover:text-white transition-colors duration-150"
+              className={`w-12 h-12 flex items-center justify-center transition-colors duration-150 ${
+                theme === 'light' ? 'text-slate-600 hover:bg-red-600 hover:text-white' : 'text-white/70 hover:bg-red-600 hover:text-white'
+              }`}
               title="关闭"
             >
               <svg className="w-3.5 h-3.5" viewBox="0 0 10 10">
@@ -478,7 +509,7 @@ export default function App() {
           transferState={transferState} 
           onPause={handlePause}
           onResume={handleResume}
-          onCancel={handleCancel}
+          onCancel={requestCancelTransfer}
         />
 
         {/* App Main Area */}
@@ -498,7 +529,7 @@ export default function App() {
             
             {/* 1. SEND VIEW */}
             {activeTab === 'send' && (
-              <Radar devices={devices} onSelectDevice={handleSelectDevice} onDirectConnect={handleDirectConnect} onSpeedTest={handleStartSpeedTest} />
+              <Radar devices={devices} onSelectDevice={handleSelectDevice} onDirectConnect={handleDirectConnect} onSpeedTest={handleStartSpeedTest} theme={theme} />
             )}
 
             {/* 2. HISTORY VIEW */}
@@ -654,8 +685,12 @@ export default function App() {
                       )}
                       
                       <button
-                        onClick={handleCancel}
-                        className="px-6 py-2.5 rounded-xl bg-red-600/20 hover:bg-red-600/30 border border-red-500/30 hover:border-red-500/50 active:scale-95 text-xs font-bold tracking-wider text-red-300 transition-all duration-200 flex items-center gap-2"
+                        onClick={requestCancelTransfer}
+                        className={`px-6 py-2.5 rounded-xl border active:scale-95 text-xs font-bold tracking-wider transition-all duration-200 flex items-center gap-2 ${
+                          theme === 'light'
+                            ? 'bg-red-50 hover:bg-red-100 text-red-600 border-red-200 shadow-sm'
+                            : 'bg-red-600/20 hover:bg-red-600/30 border-red-500/30 text-red-300'
+                        }`}
                       >
                         <XCircle className="w-3.5 h-3.5" />
                         <span>中止传输</span>
@@ -806,36 +841,49 @@ export default function App() {
                   setSelectedFiles([])
                 }}
                 onSend={handleSendFiles}
+                theme={theme}
               />
             )}
 
             {/* 2. Incoming transfer request modal */}
             {incomingTransfer && !transferState && (
-              <div className="absolute inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center p-6 z-40 animate-fade-in">
-                <div className="w-full max-w-sm liquid-glass-panel rounded-3xl p-6 border border-white/20 shadow-2xl flex flex-col">
+              <div className={`absolute inset-0 flex items-center justify-center p-6 z-40 animate-fade-in transition-colors duration-200 ${
+                theme === 'dark' ? 'bg-black/60' : 'bg-slate-900/30'
+              } backdrop-blur-md`}>
+                <div className={`w-full max-w-sm rounded-3xl p-6 border shadow-2xl flex flex-col transition-colors duration-200 ${
+                  theme === 'dark' ? 'liquid-glass-panel border-white/20 text-white' : 'bg-white border-slate-200 text-slate-800 shadow-2xl'
+                }`}>
                   
-                  <div className="flex flex-col items-center text-center pb-4 mb-4 border-b border-white/10">
-                    <div className="w-16 h-16 rounded-xl bg-white/5 flex items-center justify-center border border-white/20 shadow mb-3">
+                  <div className={`flex flex-col items-center text-center pb-4 mb-4 border-b ${
+                    theme === 'dark' ? 'border-white/10' : 'border-slate-200'
+                  }`}>
+                    <div className={`w-16 h-16 rounded-xl flex items-center justify-center border shadow mb-3 ${
+                      theme === 'dark' ? 'bg-white/5 border-white/20' : 'bg-slate-100 border-slate-200'
+                    }`}>
                       <ShibaAvatar index={0} size={54} />
                     </div>
-                    <h3 className="font-bold text-lg text-white">文件接收请求</h3>
-                    <p className="text-xs text-white/50 mt-1">
-                      来自 <span className="font-semibold text-white">{incomingTransfer.senderName}</span>
+                    <h3 className={`font-bold text-lg ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>文件接收请求</h3>
+                    <p className={`text-xs mt-1 ${theme === 'dark' ? 'text-white/50' : 'text-slate-500'}`}>
+                      来自 <span className={`font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-800'}`}>{incomingTransfer.senderName}</span>
                     </p>
                   </div>
 
-                  <div className="bg-white/5 border border-white/5 p-4 rounded-2xl mb-6 text-xs text-center">
-                    <p className="text-white/60">准备发送给您：</p>
-                    <p className="font-bold text-sm text-white/95 mt-1.5 truncate max-w-xs" title={incomingTransfer.files[0]?.name}>
+                  <div className={`p-4 rounded-2xl mb-6 text-xs text-center border ${
+                    theme === 'dark' ? 'bg-white/5 border-white/5 text-white/60' : 'bg-slate-50 border-slate-200 text-slate-600'
+                  }`}>
+                    <p>准备发送给您：</p>
+                    <p className={`font-bold text-sm mt-1.5 truncate max-w-xs ${
+                      theme === 'dark' ? 'text-white/95' : 'text-slate-900'
+                    }`} title={incomingTransfer.files[0]?.name}>
                       {incomingTransfer.files[0]?.name} {incomingTransfer.files.length > 1 ? `等 ${incomingTransfer.files.length} 个文件` : ''}
                     </p>
-                    <p className="text-[10px] text-blue-400 font-mono mt-1">总大小: {formatSize(incomingTransfer.totalSize)}</p>
+                    <p className="text-[10px] text-blue-500 font-mono mt-1 font-semibold">总大小: {formatSize(incomingTransfer.totalSize)}</p>
                   </div>
 
                   <div className="flex gap-3">
                     <button
                       onClick={() => handleAcceptIncoming(false)}
-                      className="flex-1 py-3 rounded-2xl bg-red-500/20 hover:bg-red-500/30 active:scale-95 text-red-400 font-semibold border border-red-500/25 text-sm transition-all duration-300"
+                      className="flex-1 py-3 rounded-2xl bg-red-500/20 hover:bg-red-500/30 active:scale-95 text-red-500 font-semibold border border-red-500/25 text-sm transition-all duration-300"
                     >
                       拒绝
                     </button>
@@ -858,14 +906,30 @@ export default function App() {
         <WebShareModal 
           isOpen={isWebShareOpen} 
           onClose={() => setIsWebShareOpen(false)} 
+          theme={theme}
         />
 
         {/* Speedtest Dashboard Modal (Adaptive Light/Dark Theme, No Spin Circle, Big Rolling Mbps) */}
         {speedTestState && (
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-50 p-4 select-none">
-            <div className={`rounded-3xl p-6 w-full max-w-sm flex flex-col items-center text-center shadow-2xl relative overflow-hidden border transition-colors duration-300 ${
-              theme === 'dark' ? 'bg-[#1e293b] border-white/10 text-white' : 'bg-white border-gray-200 text-slate-900 shadow-xl'
+          <div className={`fixed inset-0 flex items-center justify-center z-50 p-4 select-none transition-colors duration-200 ${
+            theme === 'dark' ? 'bg-black/60' : 'bg-slate-900/30'
+          } backdrop-blur-md`}>
+            <div className={`rounded-3xl p-6 w-full max-w-sm flex flex-col items-center text-center shadow-2xl relative overflow-hidden border transition-colors duration-200 ${
+              theme === 'dark' ? 'bg-[#1e293b] border-white/10 text-white' : 'bg-white border-slate-200 text-slate-900 shadow-2xl'
             }`}>
+              {/* Close Button at top-right (ALWAYS visible) */}
+              <button
+                onClick={handleCloseSpeedTest}
+                title="关闭测速窗口"
+                className={`absolute top-4 right-4 p-1.5 rounded-xl transition ${
+                  theme === 'dark'
+                    ? 'text-white/40 hover:text-white hover:bg-white/10'
+                    : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100'
+                }`}
+              >
+                <X className="w-5 h-5" />
+              </button>
+
               <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 rounded-full blur-2xl pointer-events-none"></div>
               
               {/* Header */}
@@ -887,9 +951,9 @@ export default function App() {
                   <span className="text-4xl font-black font-mono text-sky-500 tracking-tight">
                     {(speedTestState.speedMbps || 0).toFixed(1)}
                   </span>
-                  <span className="text-sm font-bold text-sky-400">Mbps</span>
+                  <span className="text-sm font-bold text-sky-500">Mbps</span>
                 </div>
-                <span className={`text-[10px] font-mono ${theme === 'dark' ? 'text-white/40' : 'text-slate-400'}`}>
+                <span className={`text-[10px] font-mono ${theme === 'dark' ? 'text-white/40' : 'text-slate-500'}`}>
                   约 {((speedTestState.speedMbps || 0) / 8).toFixed(1)} MB/s
                 </span>
               </div>
@@ -904,14 +968,26 @@ export default function App() {
 
               {/* Dynamic Status & Diagnostics */}
               {speedTestState.isRunning ? (
-                <p className="text-xs text-sky-400 animate-pulse font-medium mb-2">⚡ 全速多通道吞吐测流中，请稍候...</p>
+                <div className="flex flex-col items-center gap-3 w-full my-2">
+                  <p className="text-xs text-sky-500 animate-pulse font-medium">⚡ 全速多通道吞吐测流中，请稍候...</p>
+                  <button
+                    onClick={handleCloseSpeedTest}
+                    className={`text-xs px-4 py-1.5 rounded-xl border transition-colors ${
+                      theme === 'dark'
+                        ? 'border-white/10 text-white/60 hover:text-white hover:bg-white/10'
+                        : 'border-slate-300 text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                    }`}
+                  >
+                    取消测速
+                  </button>
+                </div>
               ) : (
                 <div className="flex flex-col items-center gap-4 w-full">
                   {/* Performance Diagnostics Box */}
                   <div className={`text-left text-[11px] p-3 rounded-xl border leading-relaxed ${
                     (speedTestState.speedMbps || 0) < 220
-                      ? 'bg-amber-500/10 border-amber-500/30 text-amber-500'
-                      : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-500'
+                      ? (theme === 'dark' ? 'bg-amber-500/10 border-amber-500/30 text-amber-400' : 'bg-amber-50 border-amber-300 text-amber-900')
+                      : (theme === 'dark' ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' : 'bg-emerald-50 border-emerald-300 text-emerald-900')
                   }`}>
                     {(speedTestState.speedMbps || 0) < 220 ? (
                       <div>
@@ -925,13 +1001,55 @@ export default function App() {
                   </div>
 
                   <button
-                    onClick={() => setSpeedTestState(null)}
+                    onClick={handleCloseSpeedTest}
                     className="w-full bg-blue-600 hover:bg-blue-500 active:scale-95 text-white font-bold text-xs py-2.5 rounded-xl border border-white/10 transition-all duration-200 shadow-lg shadow-blue-500/20"
                   >
                     确定
                   </button>
                 </div>
               )}
+            </div>
+          </div>
+        )}
+
+        {/* Cancel Transfer Confirmation Modal */}
+        {showCancelConfirm && (
+          <div className={`fixed inset-0 flex items-center justify-center z-50 p-4 select-none transition-colors duration-200 ${
+            theme === 'dark' ? 'bg-black/60' : 'bg-slate-900/30'
+          } backdrop-blur-md`}>
+            <div className={`rounded-3xl p-6 w-full max-w-sm flex flex-col items-center text-center shadow-2xl relative overflow-hidden border transition-colors duration-200 animate-in fade-in zoom-in-95 ${
+              theme === 'dark' ? 'bg-[#1e293b] border-white/10 text-white shadow-[0_25px_60px_-15px_rgba(0,0,0,0.5)]' : 'bg-white border-slate-200 text-slate-900 shadow-2xl'
+            }`}>
+              <div className="w-14 h-14 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-500 flex items-center justify-center mb-4">
+                <AlertTriangle className="w-7 h-7" />
+              </div>
+              <h3 className={`font-bold text-lg mb-1.5 ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                确定中止文件传输？
+              </h3>
+              <p className={`text-xs mb-6 leading-relaxed ${theme === 'dark' ? 'text-white/60' : 'text-slate-500'}`}>
+                中止后当前任务将立即中断，未传输完成的文件将不会保留。
+              </p>
+              <div className="flex gap-3 w-full">
+                <button
+                  onClick={() => setShowCancelConfirm(false)}
+                  className={`flex-1 py-2.5 rounded-xl text-xs font-semibold border transition-all ${
+                    theme === 'dark'
+                      ? 'bg-white/5 hover:bg-white/10 border-white/10 text-white/80'
+                      : 'bg-slate-100 hover:bg-slate-200 border-slate-200 text-slate-700'
+                  }`}
+                >
+                  取消
+                </button>
+                <button
+                  onClick={() => {
+                    setShowCancelConfirm(false)
+                    handleCancel()
+                  }}
+                  className="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 active:scale-95 text-white text-xs font-semibold shadow-lg shadow-red-500/25 transition-all"
+                >
+                  确认中止
+                </button>
+              </div>
             </div>
           </div>
         )}

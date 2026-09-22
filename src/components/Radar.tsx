@@ -16,9 +16,10 @@ interface RadarProps {
   onSelectDevice: (device: Device) => void
   onDirectConnect?: (ip: string) => void
   onSpeedTest: (ip: string) => void
+  theme?: 'dark' | 'light'
 }
 
-export const Radar: React.FC<RadarProps> = ({ devices, onSelectDevice, onDirectConnect, onSpeedTest }) => {
+export const Radar: React.FC<RadarProps> = ({ devices, onSelectDevice, onDirectConnect, onSpeedTest, theme = 'dark' }) => {
   const [directIp, setDirectIp] = useState('')
 
   const handleDirectConnect = (e: React.FormEvent) => {
@@ -81,13 +82,21 @@ export const Radar: React.FC<RadarProps> = ({ devices, onSelectDevice, onDirectC
               <div className="flex items-center gap-2 mt-4 w-full z-20">
                 <button
                   onClick={() => onSelectDevice(device)}
-                  className="flex-1 bg-blue-600/30 hover:bg-blue-500/50 text-blue-200 border border-blue-500/40 text-[10px] py-1 rounded-lg transition-colors font-medium cursor-pointer"
+                  className={`flex-1 text-[11px] py-1.5 px-2 rounded-lg transition-all font-semibold cursor-pointer border shadow-sm ${
+                    theme === 'light'
+                      ? 'bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-200'
+                      : 'bg-blue-600/30 hover:bg-blue-500/50 text-blue-200 border-blue-500/40'
+                  }`}
                 >
                   发送文件
                 </button>
                 <button
                   onClick={() => onSpeedTest(device.ip)}
-                  className="flex-1 bg-emerald-600/30 hover:bg-emerald-500/50 text-emerald-200 border border-emerald-500/40 text-[10px] py-1 rounded-lg transition-colors font-medium cursor-pointer"
+                  className={`flex-1 text-[11px] py-1.5 px-2 rounded-lg transition-all font-semibold cursor-pointer border shadow-sm ${
+                    theme === 'light'
+                      ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-200'
+                      : 'bg-emerald-600/30 hover:bg-emerald-500/50 text-emerald-200 border-emerald-500/40'
+                  }`}
                 >
                   🚀 测速
                 </button>
@@ -108,7 +117,11 @@ export const Radar: React.FC<RadarProps> = ({ devices, onSelectDevice, onDirectC
       {/* Direct IP Fallback Connection Box */}
       <form 
         onSubmit={handleDirectConnect}
-        className="absolute bottom-6 left-6 right-6 flex items-center gap-3 bg-white/5 border border-white/10 p-2.5 rounded-xl backdrop-blur-md max-w-md mx-auto z-20"
+        className={`absolute bottom-6 left-6 right-6 flex items-center gap-3 border p-2.5 rounded-2xl backdrop-blur-md max-w-md mx-auto z-20 shadow-lg ${
+          theme === 'light'
+            ? 'bg-white/80 border-slate-200 shadow-slate-200/50'
+            : 'bg-white/5 border-white/10'
+        }`}
       >
         <div className="flex-1">
           <input
@@ -116,13 +129,17 @@ export const Radar: React.FC<RadarProps> = ({ devices, onSelectDevice, onDirectC
             placeholder="输入局域网 IP 直连 (例: 192.168.0.6)"
             value={directIp}
             onChange={(e) => setDirectIp(e.target.value)}
-            className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white placeholder-white/40 focus:outline-none focus:border-blue-500/50"
+            className={`w-full border rounded-xl px-3 py-1.5 text-xs focus:outline-none transition-all ${
+              theme === 'light'
+                ? 'bg-slate-50 border-slate-200 text-slate-800 placeholder-slate-400 focus:border-blue-500'
+                : 'bg-white/5 border-white/10 text-white placeholder-white/40 focus:border-blue-500/50'
+            }`}
           />
         </div>
         <button
           type="submit"
           disabled={!directIp.trim()}
-          className="bg-blue-600 hover:bg-blue-500 disabled:bg-white/5 disabled:text-white/30 text-white font-medium text-xs px-4 py-1.5 rounded-lg transition-colors duration-200 border border-white/10 shrink-0"
+          className="bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white font-medium text-xs px-4 py-2 rounded-xl transition-colors duration-200 shadow-sm shrink-0"
         >
           直接连接
         </button>

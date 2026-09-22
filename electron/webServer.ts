@@ -19,12 +19,32 @@ interface SseClient {
   ip: string
 }
 
+interface ActiveMobileUpload {
+  id: string
+  req: http.IncomingMessage
+  res: http.ServerResponse
+  writeStream: fs.WriteStream
+  destPath: string
+}
+
 class WebServerManager extends EventEmitter {
   private server: http.Server | null = null
   private port = 12139
   private isRunning = false
   private sseClients: Set<SseClient> = new Set()
+  private activeUploads = new Map<string, ActiveMobileUpload>()
   private pendingDownloads = new Map<string, WebFileItem>()
+  private activeSpeedTestSessions = new Map<string, {
+    id: string
+    targetIp: string
+    totalSize: number
+    bytesSent: number
+    startTime: number
+    lastIpcTime: number
+    onProgress: (prog: any) => void
+    resolve: (val: { success: boolean; speedMbps?: number; error?: string }) => void
+    timer: NodeJS.Timeout
+  }>()
   private saveDir = path.join(os.homedir(), 'Downloads')
   private getMyInfoCallback: () => { nickname: string; ip: string; avatarIndex: number } = () => ({
     nickname: 'Desktop',
@@ -154,6 +174,9 @@ class WebServerManager extends EventEmitter {
 
         // Speedtest Endpoint (Exclude Disk I/O, pure RAM transmission)
         if (url.pathname === '/api/speedtest') {
+          const sessionId = url.searchParams.get('session')
+          const session = sessionId ? this.activeSpeedTestSessions.get(sessionId) : null
+
           if (req.method === 'POST') {
             let totalBytes = 0
             req.on('data', chunk => { totalBytes += chunk.length })
@@ -166,27 +189,61 @@ class WebServerManager extends EventEmitter {
               res.end()
             })
           } else if (req.method === 'GET' || req.method === 'HEAD') {
-            const totalSize = 50 * 1024 * 1024 // 50MB
+            const totalSize = session ? session.totalSize : 50 * 1024 * 1024
             res.writeHead(200, {
               'Content-Type': 'application/octet-stream',
-              'Content-Length': totalSize.toString()
+              'Content-Length': totalSize.toString(),
+              'Cache-Control': 'no-store, no-cache, must-revalidate',
+              'Access-Control-Allow-Origin': '*'
             })
             if (req.method === 'HEAD') {
               res.end()
               return
             }
 
-            const zeroChunk = Buffer.alloc(1024 * 1024 * 2) // 2MB
+            res.socket?.setNoDelay(true)
+            const zeroChunk = Buffer.alloc(512 * 1024) // 512KB for smooth TCP pipeline
             let bytesSent = 0
             
             const pump = () => {
               if (bytesSent >= totalSize) {
                 res.end()
+                if (session) {
+                  clearTimeout(session.timer)
+                  this.activeSpeedTestSessions.delete(session.id)
+                  const duration = (Date.now() - session.startTime) / 1000 || 0.05
+                  const avgMbps = ((session.totalSize * 8) / 1024 / 1024) / duration
+                  session.resolve({ success: true, speedMbps: avgMbps })
+                }
                 return
               }
+
+              if (session && !session.startTime) {
+                session.startTime = Date.now()
+              }
+
               const chunkToSend = zeroChunk.subarray(0, Math.min(zeroChunk.length, totalSize - bytesSent))
               const canWrite = res.write(chunkToSend)
               bytesSent += chunkToSend.length
+
+              if (session) {
+                session.bytesSent = bytesSent
+                const now = Date.now()
+                if (now - session.lastIpcTime > 120 || bytesSent === totalSize) {
+                  session.lastIpcTime = now
+                  const elapsed = (now - session.startTime) / 1000 || 0.05
+                  const currentMbps = ((bytesSent * 8) / 1024 / 1024) / elapsed
+                  session.onProgress({
+                    id: session.id,
+                    direction: 'outgoing',
+                    isSpeedTest: true,
+                    progress: bytesSent / totalSize,
+                    currentMbps,
+                    bytesTransferred: bytesSent,
+                    totalSize
+                  })
+                }
+              }
 
               if (canWrite) {
                 process.nextTick(pump)
@@ -264,6 +321,74 @@ class WebServerManager extends EventEmitter {
     }
   }
 
+  public hasClient(ip: string): boolean {
+    const clean = (ip || '').replace('::ffff:', '').trim()
+    for (const client of this.sseClients) {
+      if (client.ip === clean) return true
+    }
+    return false
+  }
+
+  public startMobileSpeedTest(
+    targetIp: string,
+    onProgress: (prog: any) => void
+  ): Promise<{ success: boolean; speedMbps?: number; error?: string }> {
+    return new Promise((resolve) => {
+      const cleanTargetIp = (targetIp || '').replace('::ffff:', '').trim()
+      let targetClient: SseClient | null = null
+      for (const client of this.sseClients) {
+        if (client.ip === cleanTargetIp) {
+          targetClient = client
+          break
+        }
+      }
+
+      // If exact IP didn't match and there is exactly one mobile SSE client connected, use it as fallback
+      if (!targetClient && this.sseClients.size === 1) {
+        targetClient = Array.from(this.sseClients)[0]
+      }
+
+      if (!targetClient) {
+        return resolve({
+          success: false,
+          error: '手机未打开快传网页，请先用手机扫码打开快传页面'
+        })
+      }
+
+      const sessionId = `speedtest-${Date.now()}`
+      const totalSize = 80 * 1024 * 1024 // 80MB
+
+      const timer = setTimeout(() => {
+        if (this.activeSpeedTestSessions.has(sessionId)) {
+          this.activeSpeedTestSessions.delete(sessionId)
+          resolve({
+            success: false,
+            error: '手机测速响应超时，请确认手机保持在快传页面'
+          })
+        }
+      }, 9000)
+
+      this.activeSpeedTestSessions.set(sessionId, {
+        id: sessionId,
+        targetIp,
+        totalSize,
+        bytesSent: 0,
+        startTime: 0,
+        lastIpcTime: 0,
+        onProgress,
+        resolve,
+        timer
+      })
+
+      const msg = `data: ${JSON.stringify({
+        type: 'start-speedtest',
+        sessionId,
+        totalSize
+      })}\n\n`
+      targetClient.res.write(msg)
+    })
+  }
+
   // Desktop or Mobile sends file via Web Download (Targets specific phone only)
   public addPendingDownload(file: WebFileItem) {
     this.pendingDownloads.set(file.id, file)
@@ -292,11 +417,19 @@ class WebServerManager extends EventEmitter {
     }
 
     const destPath = path.join(currentSaveDir, safeName)
-    const writeStream = fs.createWriteStream(destPath, { highWaterMark: 1024 * 1024 * 4 })
+    const writeStream = fs.createWriteStream(destPath, { highWaterMark: 512 * 1024 })
+    req.socket?.setNoDelay(true)
 
     let received = 0
     let lastIpcTime = 0
     const transferId = `mobile-${Date.now()}-${Math.floor(Math.random() * 1000)}`
+    this.activeUploads.set(transferId, {
+      id: transferId,
+      req,
+      res,
+      writeStream,
+      destPath
+    })
 
     const desktopInfo = this.getMyInfoCallback()
     const isTargetingDesktop = !targetIp || targetIp === desktopInfo.ip
@@ -313,7 +446,13 @@ class WebServerManager extends EventEmitter {
 
     req.on('data', (chunk) => {
       received += chunk.length
-      writeStream.write(chunk)
+      const canWrite = writeStream.write(chunk)
+      if (!canWrite) {
+        req.pause()
+        writeStream.once('drain', () => {
+          req.resume()
+        })
+      }
 
       if (isTargetingDesktop) {
         const now = Date.now()
@@ -332,6 +471,7 @@ class WebServerManager extends EventEmitter {
     })
 
     req.on('end', () => {
+      this.activeUploads.delete(transferId)
       writeStream.end()
       
       if (isTargetingDesktop) {
@@ -361,12 +501,56 @@ class WebServerManager extends EventEmitter {
     })
 
     req.on('error', (err) => {
+      this.activeUploads.delete(transferId)
       console.error('Mobile upload error:', err)
-      writeStream.end()
+      try { writeStream.destroy() } catch (e) {}
       this.emit('mobile-upload-error', { id: transferId, error: err.message })
-      res.writeHead(500, { 'Content-Type': 'application/json' })
-      res.end(JSON.stringify({ success: false, error: err.message }))
+      if (!res.headersSent) {
+        res.writeHead(500, { 'Content-Type': 'application/json' })
+        res.end(JSON.stringify({ success: false, error: err.message }))
+      }
     })
+
+    req.on('close', () => {
+      if (this.activeUploads.has(transferId)) {
+        this.activeUploads.delete(transferId)
+        try { writeStream.destroy() } catch (e) {}
+      }
+    })
+  }
+
+  public cancelUpload(transferId: string): boolean {
+    const upload = this.activeUploads.get(transferId)
+    if (upload) {
+      this.activeUploads.delete(transferId)
+      try {
+        upload.writeStream.destroy()
+        if (fs.existsSync(upload.destPath)) {
+          fs.unlink(upload.destPath, () => {})
+        }
+      } catch (e) {}
+
+      try {
+        if (!upload.res.headersSent) {
+          upload.res.writeHead(499, { 'Content-Type': 'application/json' })
+          upload.res.end(JSON.stringify({ success: false, cancelled: true, error: 'Cancelled by recipient' }))
+        } else {
+          upload.res.destroy()
+        }
+      } catch (e) {}
+
+      try {
+        upload.req.socket?.destroy()
+        upload.req.destroy()
+      } catch (e) {}
+
+      this.broadcastEvent({
+        type: 'transfer-cancelled',
+        id: transferId
+      })
+      return true
+    }
+    return false
   }
 
   private handleDownload(fileId: string, res: http.ServerResponse) {
@@ -380,13 +564,16 @@ class WebServerManager extends EventEmitter {
     const stat = fs.statSync(fileItem.path)
     const encodedName = encodeURIComponent(fileItem.name)
 
+    res.socket?.setNoDelay(true)
     res.writeHead(200, {
       'Content-Type': 'application/octet-stream',
       'Content-Length': stat.size,
-      'Content-Disposition': `attachment; filename="${encodedName}"; filename*=UTF-8''${encodedName}`
+      'Content-Disposition': `attachment; filename="${encodedName}"; filename*=UTF-8''${encodedName}`,
+      'Accept-Ranges': 'bytes',
+      'Cache-Control': 'no-transform'
     })
 
-    const readStream = fs.createReadStream(fileItem.path)
+    const readStream = fs.createReadStream(fileItem.path, { highWaterMark: 512 * 1024 })
     readStream.pipe(res)
   }
 
@@ -501,6 +688,8 @@ class WebServerManager extends EventEmitter {
     let desktopInfo = null;
     let peersList = [];
     let downloadsMap = new Map();
+    let activeXhr = null;
+    let uploadFileQueue = [];
 
     const evtSource = new EventSource('/api/events');
     const statusBadge = document.getElementById('connectionStatus');
@@ -539,6 +728,45 @@ class WebServerManager extends EventEmitter {
           downloadsMap.set(data.file.id, data.file);
           renderDownloads();
           if (navigator.vibrate) navigator.vibrate(200);
+        } else if (data.type === 'start-speedtest') {
+          statusBadge.textContent = '⚡ 测速中...';
+          statusBadge.style.color = '#38bdf8';
+          statusBadge.style.borderColor = 'rgba(56, 189, 248, 0.4)';
+          
+          fetch('/api/speedtest?session=' + encodeURIComponent(data.sessionId), { cache: 'no-store' })
+            .then(res => {
+              const reader = res.body.getReader();
+              function readChunk() {
+                reader.read().then(({ done }) => {
+                  if (!done) {
+                    readChunk();
+                  } else {
+                    statusBadge.textContent = '🟢 在线';
+                    statusBadge.style.color = '#34d399';
+                    statusBadge.style.borderColor = 'rgba(52, 211, 153, 0.3)';
+                  }
+                }).catch(() => {
+                  statusBadge.textContent = '🟢 在线';
+                  statusBadge.style.color = '#34d399';
+                });
+              }
+              readChunk();
+            })
+            .catch(() => {
+              statusBadge.textContent = '🟢 在线';
+              statusBadge.style.color = '#34d399';
+            });
+        } else if (data.type === 'transfer-cancelled') {
+          if (activeXhr) {
+            activeXhr.abort();
+            activeXhr = null;
+          }
+          uploadFileQueue = [];
+          const progressCard = document.getElementById('uploadProgressCard');
+          const fileNameEl = document.getElementById('uploadFileName');
+          if (fileNameEl) fileNameEl.textContent = '❌ 对方已中止传输';
+          setTimeout(() => { if (progressCard) progressCard.style.display = 'none'; }, 2000);
+          alert('对方（电脑端）已中止本次文件传输');
         }
       } catch (err) { console.error(err); }
     };
@@ -648,21 +876,23 @@ class WebServerManager extends EventEmitter {
 
       progressCard.style.display = 'block';
 
-      let queue = Array.from(files);
+      uploadFileQueue = Array.from(files);
       function processNext() {
-        if (queue.length === 0) {
+        if (uploadFileQueue.length === 0) {
           fileNameEl.textContent = '✅ 全部发送完成！';
           percentEl.textContent = '100%';
           fillEl.style.width = '100%';
+          activeXhr = null;
           setTimeout(() => { progressCard.style.display = 'none'; }, 2500);
           return;
         }
-        const file = queue.shift();
+        const file = uploadFileQueue.shift();
         fileNameEl.textContent = file.name;
         percentEl.textContent = '0%';
         fillEl.style.width = '0%';
 
         const xhr = new XMLHttpRequest();
+        activeXhr = xhr;
         xhr.open('POST', '/api/upload', true);
         xhr.setRequestHeader('X-File-Name', encodeURIComponent(file.name));
         xhr.setRequestHeader('X-Sender-Name', encodeURIComponent(myNickname));
@@ -680,13 +910,20 @@ class WebServerManager extends EventEmitter {
         xhr.onload = () => {
           if (xhr.status === 200) {
             processNext();
+          } else if (xhr.status === 499) {
+            uploadFileQueue = [];
+            activeXhr = null;
+            fileNameEl.textContent = '❌ 对方已中止传输';
+            setTimeout(() => { progressCard.style.display = 'none'; }, 2000);
+            alert('对方（电脑端）已中止本次文件传输');
           } else {
             alert('上传失败: ' + file.name);
             progressCard.style.display = 'none';
           }
         };
         xhr.onerror = () => {
-          alert('网络传输错误: ' + file.name);
+          if (activeXhr !== xhr) return;
+          alert('网络传输中断: ' + file.name);
           progressCard.style.display = 'none';
         };
 

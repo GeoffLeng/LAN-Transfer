@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react'
-import { ArrowUp, ArrowDown, Check, AlertCircle, Play, Pause, XCircle } from 'lucide-react'
+import React, { useEffect, useState, useRef } from 'react'
+import { ArrowUp, ArrowDown, Check, AlertCircle, Play, Pause, XCircle, X } from 'lucide-react'
 
 interface TransferState {
   id: string
@@ -38,13 +38,22 @@ export const DynamicIsland: React.FC<DynamicIslandProps> = ({
   onCancel
 }) => {
   const [visible, setVisible] = useState(false)
+  const [isDismissed, setIsDismissed] = useState(false)
   const [dimensions, setDimensions] = useState('w-44 h-8 rounded-full')
+  const lastTransferIdRef = useRef<string | null>(null)
 
   useEffect(() => {
     if (!transferState || transferState.status === 'idle') {
       setVisible(false)
+      setIsDismissed(false)
       setDimensions('w-44 h-8 rounded-full')
+      lastTransferIdRef.current = null
       return
+    }
+
+    if (transferState.id !== lastTransferIdRef.current) {
+      lastTransferIdRef.current = transferState.id
+      setIsDismissed(false)
     }
 
     setVisible(true)
@@ -62,7 +71,7 @@ export const DynamicIsland: React.FC<DynamicIslandProps> = ({
     }
   }, [transferState])
 
-  if (!visible || !transferState) return null
+  if (!visible || !transferState || isDismissed) return null
 
   const isSending = transferState.direction === 'outgoing'
   const percentage = Math.round(transferState.progress * 100)
@@ -110,11 +119,21 @@ export const DynamicIsland: React.FC<DynamicIslandProps> = ({
                   {transferState.status === 'paused' && <span className="text-yellow-400 text-[10px] bg-yellow-500/10 px-1.5 py-0.2 rounded border border-yellow-500/20 font-medium">已暂停</span>}
                 </span>
               </div>
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
                 <span className="text-[10px] text-white/50 font-mono">
                   {transferState.status === 'paused' ? '已暂停' : formatSpeed(transferState.speed)}
                 </span>
                 <span className={`text-xs font-bold font-mono ${transferState.status === 'paused' ? 'text-yellow-400' : 'text-blue-400'}`}>{percentage}%</span>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setIsDismissed(true)
+                  }}
+                  className="p-1 -mr-1 rounded-md text-white/40 hover:text-white hover:bg-white/10 transition-colors pointer-events-auto"
+                  title="收起浮窗 (后台继续传输)"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
               </div>
             </div>
 
@@ -166,10 +185,11 @@ export const DynamicIsland: React.FC<DynamicIslandProps> = ({
                     e.stopPropagation()
                     onCancel?.()
                   }}
-                  className="p-1 rounded hover:bg-white/10 text-red-400 hover:text-red-300 transition-colors"
-                  title="停止传输"
+                  className="px-1.5 py-0.5 rounded hover:bg-red-500/20 text-red-400 hover:text-red-300 transition-colors flex items-center gap-1"
+                  title="中止传输"
                 >
                   <XCircle className="w-3.5 h-3.5" />
+                  <span className="text-[9px] font-semibold text-red-400">中止</span>
                 </button>
                 <span className="text-[9px] text-white/40 ml-1">
                   {transferState.status === 'paused'

@@ -6,7 +6,7 @@
 
 [![Download Windows EXE](https://img.shields.io/badge/Download-Windows_EXE-blue?style=for-the-badge&logo=windows&logoColor=white)](releases/LAN%20Transfer_Setup_1.2.0.exe)
 
-**LAN Transfer** 是一款基于 Electron + React + TypeScript + Vite + Tailwind CSS 构建的高颜值局域网文件传输工具。不仅支持 PC 客户端间极速 P2P 文件互传，还支持**手机免安装 APP 扫码一键互传**，在局域网内实现零配置、多端全平台文件传输体验。
+**LAN Transfer** 是一款基于 Electron + React + TypeScript + Vite + Tailwind CSS 构建的高颜值局域网文件传输工具。不仅支持 PC 客户端间 P2P 文件互传，还支持**手机免安装 APP 扫码一键互传**，在局域网内实现零配置、多端全平台文件传输体验。
 
 ---
 
